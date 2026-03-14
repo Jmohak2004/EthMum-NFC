@@ -37,7 +37,7 @@ const appKitStorage = {
 
 // Sepolia chain definition
 const sepolia = {
-    id: 'eip155:11155111',
+    id: 11155111,
     name: 'Sepolia',
     network: 'sepolia',
     nativeCurrency: { name: 'SepoliaETH', symbol: 'ETH', decimals: 18 },
@@ -52,7 +52,7 @@ const sepolia = {
 
 // Base Sepolia chain definition
 const baseSepolia = {
-    id: 'eip155:84532',
+    id: 84532,
     name: 'Base Sepolia',
     network: 'base-sepolia',
     nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
