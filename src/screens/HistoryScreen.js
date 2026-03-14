@@ -58,7 +58,7 @@ export default function HistoryScreen() {
     const renderItem = ({ item }) => (
         <View style={styles.historyItem}>
             <PaymentCard
-                merchant={item.merchant || 'Unknown'}
+                counterparty={item.receiverName || item.merchant || 'Unknown'}
                 wallet={item.to}
                 amount={item.amount}
                 token={item.token}

@@ -20,11 +20,11 @@ import GlassButton from '../components/GlassButton';
 import NfcPulse from '../components/NfcPulse';
 import PaymentCard from '../components/PaymentCard';
 import {
-    sendETH, sendUSDC, getEtherscanUrl, resolveENS, resolveENSProfile,
+    getEtherscanUrl, resolveENSProfile,
     sendETHViaProvider, sendUSDCViaProvider, shortenAddress,
 } from '../utils/wallet';
 import { saveTransaction } from '../utils/storage';
-import { getChainConfig } from '../config/blockchain';
+import { CHAINS, getChainConfig } from '../config/blockchain';
 
 export default function CustomerScreen() {
     const [payment, setPayment] = useState(null);
@@ -39,9 +39,41 @@ export default function CustomerScreen() {
     const qrScannedRef = useRef(false);
 
     // WalletConnect hooks
-    const { open: openWallet, close: closeWallet } = useAppKit();
+    const { open: openWallet } = useAppKit();
     const { address: connectedAddress, isConnected } = useAccount();
     const { provider: walletProvider } = useProvider();
+    const senderReady = Boolean(isConnected && connectedAddress && walletProvider);
+
+    const parseReceiverProfile = useCallback((rawData) => {
+        const parsed = JSON.parse(rawData);
+        const receiverProfile = {
+            ...parsed,
+            mode: parsed.mode || 'receive-profile',
+            receiverName: parsed.receiverName || parsed.merchant || 'Person B',
+            preferredToken: parsed.preferredToken || parsed.token || 'USDC',
+            suggestedAmount: parsed.suggestedAmount || parsed.amount,
+            preferredChain: parsed.preferredChain || parsed.chain,
+        };
+
+        const amountValue = Number(receiverProfile.suggestedAmount);
+        if (receiverProfile.mode !== 'receive-profile') {
+            throw new Error('Receiver profile is not in supported format.');
+        }
+        if (!receiverProfile.wallet) {
+            throw new Error('Receiver wallet address is missing in NFC payload.');
+        }
+        if (!receiverProfile.suggestedAmount || Number.isNaN(amountValue) || amountValue <= 0) {
+            throw new Error('Receiver payment amount is missing or invalid.');
+        }
+        if (!receiverProfile.preferredChain || !CHAINS[receiverProfile.preferredChain]) {
+            throw new Error('Receiver preferred chain is missing or unsupported.');
+        }
+        if (!receiverProfile.preferredToken || !['ETH', 'USDC'].includes(receiverProfile.preferredToken)) {
+            throw new Error('Receiver preferred token is missing or unsupported.');
+        }
+
+        return receiverProfile;
+    }, []);
 
     // Fetch ENS profile when payment is received
     useEffect(() => {
@@ -63,6 +95,13 @@ export default function CustomerScreen() {
 
     const readNfc = useCallback(async (silent = false) => {
         try {
+            if (!senderReady) {
+                if (!silent) {
+                    Alert.alert('Wallet Required', 'Connect your wallet first to start the send flow.');
+                }
+                return;
+            }
+
             const supported = await NfcManager.isSupported();
             if (!supported) {
                 if (!silent) {
@@ -81,8 +120,8 @@ export default function CustomerScreen() {
 
             if (tag?.ndefMessage?.[0]?.payload) {
                 const payload = Ndef.text.decodePayload(tag.ndefMessage[0].payload);
-                const paymentData = JSON.parse(payload);
-                setPayment(paymentData);
+                const receiverProfile = parseReceiverProfile(payload);
+                setPayment(receiverProfile);
             } else {
                 Alert.alert('No Data', 'NFC tag does not contain payment data.');
             }
@@ -97,9 +136,14 @@ export default function CustomerScreen() {
                 await NfcManager.cancelTechnologyRequest();
             } catch (_) { }
         }
-    }, []);
+    }, [senderReady, parseReceiverProfile]);
 
     const openQrScanner = useCallback(async () => {
+        if (!senderReady) {
+            Alert.alert('Wallet Required', 'Connect your wallet first to start the send flow.');
+            return;
+        }
+
         if (!permission?.granted) {
             const result = await requestPermission();
             if (!result.granted) {
@@ -109,77 +153,65 @@ export default function CustomerScreen() {
         }
         qrScannedRef.current = false;
         setQrScanning(true);
-    }, [permission, requestPermission]);
+    }, [permission, requestPermission, senderReady]);
 
     const handleQrScanned = useCallback(({ data }) => {
         if (qrScannedRef.current) return;
         qrScannedRef.current = true;
         try {
-            const paymentData = JSON.parse(data);
-            if ((paymentData.wallet || paymentData.ens) && paymentData.amount && paymentData.token) {
-                setQrScanning(false);
-                setPayment(paymentData);
-            } else {
-                Alert.alert('Invalid QR', 'This QR code does not contain valid payment data.');
-                setQrScanning(false);
-            }
+            const receiverProfile = parseReceiverProfile(data);
+            setQrScanning(false);
+            setPayment(receiverProfile);
         } catch (e) {
-            Alert.alert('Invalid QR', 'Could not read payment data from this QR code.');
+            Alert.alert('Invalid QR', e?.message || 'Could not read payment data from this QR code.');
             setQrScanning(false);
         }
-    }, []);
+    }, [parseReceiverProfile]);
 
-    useEffect(() => {
-        readNfc(true);
-    }, []);
-
-    const confirmPayment = useCallback(async () => {
+    const executePayment = useCallback(async () => {
         if (!payment) return;
 
         try {
+            if (!senderReady) {
+                Alert.alert('Wallet Required', 'Connect your wallet first before confirming the transaction.');
+                return;
+            }
+
             setSending(true);
             setPendingHash(null);
 
-            // Resolve ENS if needed
-            let toAddress = payment.wallet;
-            if (!toAddress && payment.ens) {
-                setSendingStatus(`Resolving ${payment.ens}...`);
-                toAddress = await resolveENS(payment.ens);
-                if (!toAddress) {
-                    Alert.alert('ENS Error', `Could not resolve "${payment.ens}". Check the name and try again.`);
-                    setSending(false);
-                    return;
-                }
+            const recipientName = payment.receiverName || payment.merchant || 'Person B';
+            const tokenToSend = payment.preferredToken || payment.token || 'USDC';
+            const amountToSend = payment.suggestedAmount || payment.amount;
+            const chainKey = payment.preferredChain || payment.chain || 'base-sepolia';
+
+            if (!amountToSend || parseFloat(amountToSend) <= 0) {
+                Alert.alert('Missing Amount', `${recipientName} did not provide a valid requested amount.`);
+                setSending(false);
+                return;
+            }
+
+            const toAddress = payment.wallet;
+            if (!toAddress) {
+                Alert.alert('Missing Receiver Wallet', 'Receiver wallet address is required to prepare this transaction.');
+                return;
             }
 
             let result;
 
-            const chainKey = payment.chain || 'sepolia';
             const chainName = getChainConfig(chainKey).name;
 
-            // Use connected wallet if available, otherwise fall back to demo wallet
-            if (isConnected && walletProvider) {
-                setSendingStatus(`Switching to ${chainName}...`);
-                if (payment.token === 'ETH') {
-                    result = await sendETHViaProvider(walletProvider, toAddress, payment.amount, chainKey);
-                } else {
-                    result = await sendUSDCViaProvider(walletProvider, toAddress, payment.amount, chainKey);
-                }
+            setSendingStatus(`Switching to ${chainName}...`);
+            if (tokenToSend === 'ETH') {
+                result = await sendETHViaProvider(walletProvider, toAddress, amountToSend, chainKey);
             } else {
-                setSendingStatus('Preparing transaction...');
-                if (payment.token === 'ETH') {
-                    setSendingStatus(`Sending ETH on ${chainName}...`);
-                    result = await sendETH(toAddress, payment.amount, chainKey);
-                } else {
-                    setSendingStatus(`Sending USDC on ${chainName}...`);
-                    result = await sendUSDC(toAddress, payment.amount, chainKey);
-                }
+                result = await sendUSDCViaProvider(walletProvider, toAddress, amountToSend, chainKey);
             }
 
             setPendingHash(result.hash);
             setSendingStatus('Confirming on-chain...');
 
-            result.merchant = payment.merchant;
+            result.receiverName = recipientName;
             result.chain = chainKey;
             result.ensName = ensProfile?.ensName || payment.ens || null;
             setTxResult(result);
@@ -198,17 +230,88 @@ export default function CustomerScreen() {
             setSendingStatus('');
             setPendingHash(null);
         }
-    }, [payment, isConnected, walletProvider, ensProfile]);
+    }, [payment, senderReady, walletProvider, ensProfile]);
+
+    const confirmPayment = useCallback(() => {
+        if (!payment || sending) return;
+        if (!senderReady) {
+            Alert.alert('Wallet Required', 'Connect your wallet before confirming this transaction.');
+            return;
+        }
+
+        const recipientLabel = payment.ens || payment.wallet || 'Unknown recipient';
+        const chainName = getChainConfig(payment.preferredChain || payment.chain || 'base-sepolia').name;
+        const tokenToSend = payment.preferredToken || payment.token || 'USDC';
+        const amountToSend = payment.suggestedAmount || payment.amount;
+        const receiverName = payment.receiverName || payment.merchant || 'Person B';
+        const message = [
+            `Receiver: ${receiverName}`,
+            `Recipient: ${recipientLabel}`,
+            `Amount: ${amountToSend} ${tokenToSend}`,
+            `Receiver Chain Preference: ${chainName}`,
+            '',
+            'Do you want to confirm this transaction?',
+        ].join('\n');
+
+        Alert.alert('Confirm Transaction', message, [
+            {
+                text: 'Not Now',
+                style: 'cancel',
+            },
+            {
+                text: 'Confirm',
+                style: 'default',
+                onPress: () => {
+                    executePayment();
+                },
+            },
+        ]);
+    }, [payment, sending, executePayment, senderReady]);
 
     return (
         <LinearGradient colors={GRADIENTS.bg} style={styles.container}>
             <ScrollView contentContainerStyle={styles.scroll}>
                 {/* Title */}
                 <View style={styles.titleRow}>
-                    <Ionicons name="scan-outline" size={28} color={COLORS.secondary} />
-                    <Text style={styles.title}>Customer</Text>
+                    <Ionicons name="send-outline" size={28} color={COLORS.secondary} />
+                    <Text style={styles.title}>Send</Text>
                 </View>
-                <Text style={styles.subtitle}>Tap phone to receive payment request</Text>
+                <Text style={styles.subtitle}>Person A taps Person B to receive ENS + wallet + preferred chain</Text>
+
+                <View style={styles.strictModeBanner}>
+                    <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.warning} />
+                    <Text style={styles.strictModeText}>Strict flow: connect wallet, tap receiver, then confirm transaction.</Text>
+                </View>
+
+                <View style={styles.walletSectionTop}>
+                    {isConnected ? (
+                        <View style={styles.connectedBadge}>
+                            <Ionicons name="wallet" size={16} color={COLORS.success} />
+                            <Text style={styles.connectedText}>
+                                {shortenAddress(connectedAddress)}
+                            </Text>
+                            <Text
+                                style={styles.disconnectLink}
+                                onPress={() => openWallet()}
+                            >
+                                Change
+                            </Text>
+                        </View>
+                    ) : (
+                        <GlassButton
+                            title="Connect Wallet to Start"
+                            onPress={() => openWallet()}
+                            gradient={[COLORS.secondary, '#b388ff']}
+                            icon={<Ionicons name="wallet-outline" size={20} color="#fff" />}
+                        />
+                    )}
+
+                    {!senderReady && (
+                        <Text style={styles.strictModeHelp}>
+                            Step 1: connect wallet before reading receiver profile.
+                        </Text>
+                    )}
+                </View>
 
                 {/* NFC Scan Area */}
                 {!payment && !qrScanning && (
@@ -219,15 +322,16 @@ export default function CustomerScreen() {
                             size={90}
                         />
                         <Text style={styles.scanLabel}>
-                            {scanning ? 'Scanning for NFC...' : 'Tap NFC tag or scan QR'}
+                            {scanning ? 'Scanning for receiver profile...' : 'Tap Person B phone or scan QR'}
                         </Text>
                         {!scanning && (
                             <>
                                 <GlassButton
-                                    title="Scan NFC Tag"
+                                    title="Read Receiver via NFC"
                                     onPress={readNfc}
                                     gradient={[COLORS.secondary, '#b388ff']}
                                     icon={<Ionicons name="radio-outline" size={20} color="#fff" />}
+                                    disabled={!senderReady}
                                     style={{ marginTop: SPACING.lg }}
                                 />
                                 <View style={styles.divider}>
@@ -240,6 +344,7 @@ export default function CustomerScreen() {
                                     onPress={openQrScanner}
                                     gradient={[COLORS.primary, '#00b8d4']}
                                     icon={<Ionicons name="qr-code-outline" size={20} color="#fff" />}
+                                    disabled={!senderReady}
                                     style={{ marginTop: SPACING.md }}
                                 />
                             </>
@@ -262,7 +367,7 @@ export default function CustomerScreen() {
                                 <View style={styles.qrFrame} />
                             </View>
                         </View>
-                        <Text style={styles.qrScanLabel}>Point camera at merchant's QR code</Text>
+                        <Text style={styles.qrScanLabel}>Point camera at Person B QR code</Text>
                         <GlassButton
                             title="Cancel"
                             onPress={() => setQrScanning(false)}
@@ -278,49 +383,19 @@ export default function CustomerScreen() {
                     <View style={styles.paymentSection}>
                         <View style={styles.badge}>
                             <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-                            <Text style={styles.badgeText}>Payment Request Received</Text>
+                            <Text style={styles.badgeText}>Receiver Profile Received</Text>
                         </View>
 
                         <PaymentCard
-                            merchant={payment.merchant}
+                            merchant={payment.receiverName || payment.merchant || 'Receiver'}
                             wallet={ensProfile?.address || payment.wallet}
-                            amount={payment.amount}
-                            token={payment.token}
+                            amount={payment.suggestedAmount || payment.amount}
+                            token={payment.preferredToken || payment.token}
                             ensName={ensProfile?.ensName || payment.ens}
                             avatar={ensProfile?.avatar}
-                            chain={payment.chain}
+                            chain={payment.preferredChain || payment.chain}
                             textRecords={ensProfile?.textRecords}
                         />
-
-                        {/* Wallet Connection */}
-                        <View style={styles.walletSection}>
-                            {isConnected ? (
-                                <View style={styles.connectedBadge}>
-                                    <Ionicons name="wallet" size={16} color={COLORS.success} />
-                                    <Text style={styles.connectedText}>
-                                        {shortenAddress(connectedAddress)}
-                                    </Text>
-                                    <Text
-                                        style={styles.disconnectLink}
-                                        onPress={() => openWallet()}
-                                    >
-                                        Change
-                                    </Text>
-                                </View>
-                            ) : (
-                                <GlassButton
-                                    title="Connect Wallet (Rainbow, MetaMask...)"
-                                    onPress={() => openWallet()}
-                                    gradient={[COLORS.secondary, '#b388ff']}
-                                    icon={<Ionicons name="wallet-outline" size={20} color="#fff" />}
-                                />
-                            )}
-                            {!isConnected && (
-                                <Text style={styles.demoHint}>
-                                    Or tap Pay below to use the demo wallet
-                                </Text>
-                            )}
-                        </View>
 
                         {/* Sending Progress */}
                         {sending && (
@@ -332,7 +407,7 @@ export default function CustomerScreen() {
                                         <Text style={styles.hashLabel}>Tx Hash:</Text>
                                         <Text
                                             style={styles.hashValue}
-                                            onPress={() => Linking.openURL(getEtherscanUrl(pendingHash, payment?.chain))}
+                                            onPress={() => Linking.openURL(getEtherscanUrl(pendingHash, payment?.preferredChain || payment?.chain))}
                                         >
                                             {pendingHash.slice(0, 10)}...{pendingHash.slice(-8)}
                                         </Text>
@@ -343,10 +418,10 @@ export default function CustomerScreen() {
                         )}
 
                         <GlassButton
-                            title={sending ? 'Sending...' : 'Confirm & Pay'}
+                            title={sending ? 'Sending...' : 'Confirm & Send'}
                             onPress={confirmPayment}
                             gradient={GRADIENTS.success}
-                            disabled={sending}
+                            disabled={sending || !senderReady}
                             icon={
                                 <Ionicons
                                     name={sending ? 'hourglass-outline' : 'send'}
@@ -375,12 +450,12 @@ export default function CustomerScreen() {
                         <View style={[styles.badge, { backgroundColor: COLORS.successDim }]}>
                             <Ionicons name="checkmark-done" size={16} color={COLORS.success} />
                             <Text style={[styles.badgeText, { color: COLORS.success }]}>
-                                Transaction Confirmed
+                                Transfer Confirmed
                             </Text>
                         </View>
 
                         <PaymentCard
-                            merchant={txResult.merchant}
+                            merchant={txResult.receiverName || payment?.receiverName || payment?.merchant}
                             wallet={txResult.to}
                             amount={txResult.amount}
                             token={txResult.token}
@@ -388,20 +463,20 @@ export default function CustomerScreen() {
                             timestamp={txResult.timestamp}
                             ensName={ensProfile?.ensName}
                             avatar={ensProfile?.avatar}
-                            chain={payment?.chain}
+                            chain={payment?.preferredChain || payment?.chain}
                             textRecords={ensProfile?.textRecords}
                         />
 
                         <GlassButton
-                            title="View on Sepolia Etherscan"
-                            onPress={() => Linking.openURL(getEtherscanUrl(txResult.hash, payment?.chain))}
+                            title="View on Base Explorer"
+                            onPress={() => Linking.openURL(getEtherscanUrl(txResult.hash, payment?.preferredChain || payment?.chain))}
                             gradient={GRADIENTS.primary}
                             icon={<Ionicons name="open-outline" size={20} color="#fff" />}
                             style={{ marginTop: SPACING.md }}
                         />
 
                         <GlassButton
-                            title="New Payment"
+                            title="Send Another"
                             onPress={() => { setPayment(null); setTxResult(null); readNfc(); }}
                             gradient={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)']}
                             icon={<Ionicons name="add" size={20} color={COLORS.textSecondary} />}
@@ -437,7 +512,28 @@ const styles = StyleSheet.create({
     subtitle: {
         color: COLORS.textSecondary,
         fontSize: FONT.size.md,
-        marginBottom: SPACING.xl,
+        marginBottom: SPACING.lg,
+    },
+    strictModeBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.xs,
+        alignSelf: 'flex-start',
+        backgroundColor: COLORS.warning + '1A',
+        borderWidth: 1,
+        borderColor: COLORS.warning + '66',
+        borderRadius: RADIUS.full,
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.xs,
+        marginBottom: SPACING.md,
+    },
+    strictModeText: {
+        color: COLORS.warning,
+        fontSize: FONT.size.xs,
+        ...FONT.medium,
+    },
+    walletSectionTop: {
+        marginBottom: SPACING.md,
     },
     scanSection: {
         alignItems: 'center',
@@ -554,10 +650,6 @@ const styles = StyleSheet.create({
         fontSize: FONT.size.xs,
         marginTop: SPACING.xs,
     },
-    walletSection: {
-        marginTop: SPACING.lg,
-        marginBottom: SPACING.sm,
-    },
     connectedBadge: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -581,8 +673,8 @@ const styles = StyleSheet.create({
         textDecorationLine: 'underline',
         marginLeft: SPACING.xs,
     },
-    demoHint: {
-        color: COLORS.textMuted,
+    strictModeHelp: {
+        color: COLORS.warning,
         fontSize: FONT.size.xs,
         textAlign: 'center',
         marginTop: SPACING.sm,
