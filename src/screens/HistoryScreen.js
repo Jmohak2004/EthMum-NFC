@@ -18,6 +18,7 @@ import PaymentCard from '../components/PaymentCard';
 import GlassButton from '../components/GlassButton';
 import { getTransactions, clearTransactions } from '../utils/storage';
 import { getEtherscanUrl } from '../utils/wallet';
+import { getChainConfig } from '../config/blockchain';
 
 export default function HistoryScreen() {
     const [transactions, setTransactions] = useState([]);
@@ -55,12 +56,7 @@ export default function HistoryScreen() {
     };
 
     const renderItem = ({ item }) => (
-        <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-                if (item.hash) Linking.openURL(getEtherscanUrl(item.hash));
-            }}
-        >
+        <View style={styles.historyItem}>
             <PaymentCard
                 merchant={item.merchant || 'Unknown'}
                 wallet={item.to}
@@ -68,8 +64,22 @@ export default function HistoryScreen() {
                 token={item.token}
                 txHash={item.hash}
                 timestamp={item.timestamp}
+                chain={item.chain}
+                ensName={item.ensName}
             />
-        </TouchableOpacity>
+            {item.hash && (
+                <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={styles.explorerBtn}
+                    onPress={() => Linking.openURL(getEtherscanUrl(item.hash, item.chain))}
+                >
+                    <Ionicons name="open-outline" size={14} color={COLORS.primary} />
+                    <Text style={styles.explorerBtnText}>
+                        View on {item.chain ? getChainConfig(item.chain).name : 'Base'} Explorer
+                    </Text>
+                </TouchableOpacity>
+            )}
+        </View>
     );
 
     return (
@@ -96,7 +106,7 @@ export default function HistoryScreen() {
             {transactions.length > 0 ? (
                 <FlatList
                     data={transactions}
-                    keyExtractor={(_, i) => String(i)}
+                    keyExtractor={(item) => item.hash || String(Math.random())}
                     renderItem={renderItem}
                     contentContainerStyle={styles.list}
                     refreshControl={
@@ -185,5 +195,27 @@ const styles = StyleSheet.create({
         color: COLORS.textMuted,
         fontSize: FONT.size.md,
         textAlign: 'center',
+    },
+    historyItem: {
+        marginBottom: SPACING.sm,
+    },
+    explorerBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: SPACING.xs,
+        backgroundColor: COLORS.primaryDim,
+        borderWidth: 1,
+        borderColor: COLORS.primary + '30',
+        borderRadius: RADIUS.full,
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
+        marginTop: -SPACING.xs,
+        marginBottom: SPACING.sm,
+    },
+    explorerBtnText: {
+        color: COLORS.primary,
+        fontSize: FONT.size.sm,
+        ...FONT.medium,
     },
 });

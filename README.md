@@ -1,11 +1,11 @@
 # EthMum NFC Pay 💳⚡
 
-> Hackathon-ready React Native (Expo) app for **NFC phone-to-phone crypto payments** on Ethereum.
+> Hackathon-ready React Native (Expo) app for **NFC tag-based crypto payments** on Ethereum.
 
 ## 🔥 Features
 
-- **Merchant Mode** — Enter amount, select token (USDC/ETH), write payment request to NFC
-- **Customer Mode** — Read NFC tag, view payment details, confirm & send on-chain transaction
+- **Merchant Mode** — Enter amount, select token (USDC/ETH), write payment request to a physical NFC tag
+- **Customer Mode** — Tap the NFC tag, view payment details, confirm & send on-chain transaction
 - **Transaction History** — Persistent log with Etherscan links
 - **ENS Resolution** — Resolve `.eth` names to wallet addresses
 - **Dark Neon UI** — Glassmorphic cards, animated NFC pulse, gradient buttons
@@ -14,7 +14,7 @@
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | React Native + Expo SDK 52 |
+| Framework | React Native + Expo SDK 55 |
 | NFC | `react-native-nfc-manager` |
 | Blockchain | `ethers` v6 (Sepolia testnet) |
 | Navigation | `@react-navigation/bottom-tabs` |
@@ -57,22 +57,25 @@ src/
 ## 🔄 Payment Flow
 
 ```
-Merchant Phone → Enter Amount → Tap "Send via NFC"
+Merchant Phone → Enter Amount → Tap "Write to NFC Tag"
         ↓
-    Phones Touch (NFC)
+    Merchant taps physical NFC tag (writes payment data)
         ↓
-Customer Phone → Reads Payment Data → Shows PaymentCard
+Customer Phone → Taps the same NFC tag → Reads Payment Data
         ↓
-    Tap "Confirm & Pay"
+    Shows PaymentCard → Tap "Confirm & Pay"
         ↓
     On-chain USDC/ETH Transfer → Etherscan Receipt
 ```
 
+> 💡 Use cheap NFC215/NTAG215 stickers (~$1 each). The merchant writes the payment request to the tag, and the customer taps the same tag to read it.
+
 ## ⚠️ Important Notes
 
 - **NFC requires a physical Android device** — won't work in Expo Go or simulators
+- **You need physical NFC tags** — NTAG215 stickers work great and cost ~$1 each
 - **Uses Sepolia testnet** — no real funds. Get test ETH from [Sepolia faucet](https://sepoliafaucet.com/)
-- **Demo wallet** — replace the private key in `wallet.js` for production
+- **Wallet config** — add your private key to the `.env` file (never commit it!)
 
 ## 🏆 Hackathon Upgrade Ideas
 
