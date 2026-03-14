@@ -2,11 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const TX_KEY = '@ethmum_transactions';
 export const TX_STORAGE_KEY = TX_KEY;
+const MAX_TRANSACTIONS = 100;
 
 export async function saveTransaction(tx) {
     try {
         const existing = await getTransactions();
-        const updated = [tx, ...existing];
+        const updated = [tx, ...existing].slice(0, MAX_TRANSACTIONS);
         await AsyncStorage.setItem(TX_KEY, JSON.stringify(updated));
     } catch (e) {
         console.warn('Failed to save transaction:', e);

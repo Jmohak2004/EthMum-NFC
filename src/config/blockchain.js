@@ -1,5 +1,6 @@
 // ─── Blockchain Configuration ────────────────────────────────────────
 // Non-secret config lives here. Secrets (private keys, API keys) stay in .env
+import { SEPOLIA_RPC_URL, BASE_SEPOLIA_RPC_URL } from '@env';
 
 // ─── Chain Definitions ──────────────────────────────────────────────
 export const CHAINS = {
@@ -8,7 +9,7 @@ export const CHAINS = {
         chainId: 11155111,
         hexChainId: '0xaa36a7',
         name: 'Sepolia',
-        rpcUrl: 'https://rpc.sepolia.org',
+        rpcUrl: SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
         nativeCurrency: { name: 'SepoliaETH', symbol: 'ETH', decimals: 18 },
         usdc: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
         explorer: {
@@ -22,7 +23,7 @@ export const CHAINS = {
         chainId: 84532,
         hexChainId: '0x14a34',
         name: 'Base Sepolia',
-        rpcUrl: 'https://sepolia.base.org',
+        rpcUrl: BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
         nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
         usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Base Sepolia USDC
         explorer: {

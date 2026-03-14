@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { DEMO_PRIVATE_KEY, SEPOLIA_RPC_URL } from '@env';
+import { DEMO_PRIVATE_KEY } from '@env';
 import { CONTRACTS, ERC20_ABI, EXPLORER, CHAINS, DEFAULT_CHAIN, getChainConfig, getUSDCAddress } from '../config/blockchain';
 
 // ─── Provider ────────────────────────────────────────────────────────
