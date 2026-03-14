@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import NfcManager, { Ndef } from 'react-native-nfc-manager';
+import NfcManager, { Ndef } from '../utils/nfcProxy';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAppKit, useAccount, useProvider } from '@reown/appkit-react-native';
 import { COLORS, SPACING, RADIUS, FONT, GRADIENTS, SHADOWS } from '../theme';
