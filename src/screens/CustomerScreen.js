@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import NfcManager, { Ndef } from 'react-native-nfc-manager';
+import NfcManager, { Ndef } from '../utils/nfcProxy';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAppKit, useAccount, useProvider } from '@reown/appkit-react-native';
 import { COLORS, SPACING, RADIUS, FONT, GRADIENTS, SHADOWS } from '../theme';
@@ -36,6 +36,7 @@ export default function CustomerScreen() {
     const [txResult, setTxResult] = useState(null);
     const [ensProfile, setEnsProfile] = useState(null);
     const [permission, requestPermission] = useCameraPermissions();
+    const qrScannedRef = useRef(false);
 
     // WalletConnect hooks
     const { open: openWallet, close: closeWallet } = useAppKit();
@@ -104,10 +105,13 @@ export default function CustomerScreen() {
                 return;
             }
         }
+        qrScannedRef.current = false;
         setQrScanning(true);
     }, [permission, requestPermission]);
 
     const handleQrScanned = useCallback(({ data }) => {
+        if (qrScannedRef.current) return;
+        qrScannedRef.current = true;
         try {
             const paymentData = JSON.parse(data);
             if ((paymentData.wallet || paymentData.ens) && paymentData.amount && paymentData.token) {
@@ -192,7 +196,7 @@ export default function CustomerScreen() {
             setSendingStatus('');
             setPendingHash(null);
         }
-    }, [payment, isConnected, walletProvider]);
+    }, [payment, isConnected, walletProvider, ensProfile]);
 
     return (
         <LinearGradient colors={GRADIENTS.bg} style={styles.container}>

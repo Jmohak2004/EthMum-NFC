@@ -42,6 +42,12 @@
           "selectIdentifiers": [],
           "systemCodes": []
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow this app to access your camera to scan QR codes for crypto payments."
+        }
       ]
     ],
     "extra": {

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { StatusBar, LogBox, View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import NfcManager from 'react-native-nfc-manager';
+import NfcManager from './src/utils/nfcProxy';
 import { AppKitProvider, AppKit } from '@reown/appkit-react-native';
 import { appKit } from './src/config/AppKitConfig';
 import AppNavigator from './src/navigation/AppNavigator';

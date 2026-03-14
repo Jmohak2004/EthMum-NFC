@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import NfcManager, { Ndef } from 'react-native-nfc-manager';
+import NfcManager, { Ndef } from '../utils/nfcProxy';
 import { ethers } from 'ethers';
 import QRCode from 'react-native-qrcode-svg';
 import { COLORS, SPACING, RADIUS, FONT, GRADIENTS, SHADOWS } from '../theme';
