@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const TX_KEY = '@ethmum_transactions';
+export const TX_KEY = '@ethmum_transactions';
+export const TX_STORAGE_KEY = TX_KEY;
 
 export async function saveTransaction(tx) {
     try {

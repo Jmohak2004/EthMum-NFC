@@ -1,8 +1,9 @@
 module.exports = function (api) {
-  api.cache(true);
+  api.cache.using(() => process.env.NODE_ENV);
+  const isTest = api.env('test');
   return {
-    presets: [['babel-preset-expo', { unstable_transformImportMeta: true }]],
-    plugins: [
+    presets: ['babel-preset-expo'],
+    plugins: isTest ? [] : [
       [
         'module:react-native-dotenv',
         {
