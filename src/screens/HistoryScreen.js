@@ -106,7 +106,7 @@ export default function HistoryScreen() {
             {transactions.length > 0 ? (
                 <FlatList
                     data={transactions}
-                    keyExtractor={(item) => item.hash || String(Math.random())}
+                    keyExtractor={(item, index) => item.hash || `tx-${index}`}
                     renderItem={renderItem}
                     contentContainerStyle={styles.list}
                     refreshControl={

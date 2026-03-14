@@ -31,8 +31,8 @@ export default function MerchantScreen() {
     const [qrPayload, setQrPayload] = useState(null);
 
     const sendPayment = useCallback(async () => {
-        if (!amount || parseFloat(amount) <= 0) {
-            Alert.alert('Invalid Amount', 'Please enter a valid payment amount.');
+        if (!amount || !/^\d+(\.\d+)?$/.test(amount) || parseFloat(amount) <= 0) {
+            Alert.alert('Invalid Amount', 'Please enter a valid number (e.g. 1.50).');
             return;
         }
 
@@ -68,6 +68,11 @@ export default function MerchantScreen() {
 
         const paymentData = JSON.stringify(payload);
 
+        if (paymentData.length > 500) {
+            Alert.alert('Payload Too Large', 'Payment data may exceed NFC tag capacity. Try shortening the merchant name.');
+            return;
+        }
+
         try {
             const supported = await NfcManager.isSupported();
             if (!supported) {
@@ -99,8 +104,8 @@ export default function MerchantScreen() {
     const resetStatus = () => setNfcStatus('idle');
 
     const generateQr = useCallback(async () => {
-        if (!amount || parseFloat(amount) <= 0) {
-            Alert.alert('Invalid Amount', 'Please enter a valid payment amount.');
+        if (!amount || !/^\d+(\.\d+)?$/.test(amount) || parseFloat(amount) <= 0) {
+            Alert.alert('Invalid Amount', 'Please enter a valid number (e.g. 1.50).');
             return;
         }
 
@@ -312,7 +317,9 @@ export default function MerchantScreen() {
                             {
                                 version: 1,
                                 merchant: merchantName,
-                                wallet: walletAddress,
+                                ...(walletAddress.endsWith('.eth')
+                                    ? { ens: walletAddress }
+                                    : { wallet: walletAddress }),
                                 amount: amount || '0',
                                 token: selectedToken,
                                 decimals: selectedToken === 'USDC' ? 6 : 18,

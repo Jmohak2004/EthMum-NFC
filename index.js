@@ -1,3 +1,4 @@
+import 'react-native-get-random-values'; // Must be first — polyfills crypto for ethers.js
 import { registerRootComponent } from 'expo';
 
 import App from './App';

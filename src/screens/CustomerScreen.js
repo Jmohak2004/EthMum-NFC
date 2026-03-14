@@ -61,11 +61,13 @@ export default function CustomerScreen() {
         }
     }, [payment]);
 
-    const readNfc = useCallback(async () => {
+    const readNfc = useCallback(async (silent = false) => {
         try {
             const supported = await NfcManager.isSupported();
             if (!supported) {
-                Alert.alert('NFC Unavailable', 'This device does not support NFC. You need a physical Android device to scan NFC tags.');
+                if (!silent) {
+                    Alert.alert('NFC Unavailable', 'This device does not support NFC. You need a physical Android device to scan NFC tags.');
+                }
                 return;
             }
 
@@ -128,7 +130,7 @@ export default function CustomerScreen() {
     }, []);
 
     useEffect(() => {
-        readNfc();
+        readNfc(true);
     }, []);
 
     const confirmPayment = useCallback(async () => {
