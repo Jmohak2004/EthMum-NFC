@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
     View,
     Text,
@@ -14,66 +14,155 @@ import { Ionicons } from '@expo/vector-icons';
 import NfcManager, { Ndef } from '../utils/nfcProxy';
 import { ethers } from 'ethers';
 import QRCode from 'react-native-qrcode-svg';
+import { useAppKit, useAccount } from '@reown/appkit-react-native';
 import { COLORS, SPACING, RADIUS, FONT, GRADIENTS, SHADOWS } from '../theme';
 import GlassButton from '../components/GlassButton';
 import NfcPulse from '../components/NfcPulse';
 import { CHAINS, CHAIN_KEYS, DEFAULT_CHAIN } from '../config/blockchain';
+import { resolveENS, resolvePrimaryENS, shortenAddress } from '../utils/wallet';
 
 const TOKENS = ['USDC', 'ETH'];
 
 export default function MerchantScreen() {
-    const [merchantName, setMerchantName] = useState('CoffeeShop');
+    const [receiverName, setReceiverName] = useState('Person B');
     const [walletAddress, setWalletAddress] = useState('');
     const [amount, setAmount] = useState('');
     const [selectedToken, setSelectedToken] = useState('USDC');
     const [selectedChain, setSelectedChain] = useState(DEFAULT_CHAIN);
     const [nfcStatus, setNfcStatus] = useState('idle'); // idle | writing | success | error
     const [qrPayload, setQrPayload] = useState(null);
+    const [connectedEnsName, setConnectedEnsName] = useState(null);
+    const [resolvingWallet, setResolvingWallet] = useState(false);
 
-    const sendPayment = useCallback(async () => {
+    const { open: openWallet } = useAppKit();
+    const { address: connectedAddress, isConnected } = useAccount();
+    const receiverReady = Boolean(isConnected && connectedAddress && !resolvingWallet);
+
+    useEffect(() => {
+        let active = true;
+
+        const hydrateConnectedWallet = async () => {
+            if (!isConnected || !connectedAddress) {
+                if (!active) return;
+                setConnectedEnsName(null);
+                setWalletAddress('');
+                setResolvingWallet(false);
+                return;
+            }
+
+            if (active) {
+                setResolvingWallet(true);
+            }
+
+            const ensName = await resolvePrimaryENS(connectedAddress);
+            if (!active) return;
+
+            if (ensName) {
+                setConnectedEnsName(ensName);
+                setWalletAddress(ensName);
+            } else {
+                setConnectedEnsName(null);
+                setWalletAddress(connectedAddress);
+            }
+
+            setResolvingWallet(false);
+        };
+
+        hydrateConnectedWallet().catch((e) => {
+            console.warn('Wallet autofill failed:', e);
+            if (active) {
+                setWalletAddress(connectedAddress || '');
+                setConnectedEnsName(null);
+                setResolvingWallet(false);
+            }
+        });
+
+        return () => {
+            active = false;
+        };
+    }, [isConnected, connectedAddress]);
+
+    const validateInputs = useCallback(() => {
+        if (!isConnected || !connectedAddress) {
+            Alert.alert('Wallet Required', 'Strict receiver mode is enabled. Connect your wallet to share your receive profile.');
+            return false;
+        }
+
+        if (resolvingWallet) {
+            Alert.alert('Please Wait', 'Resolving your wallet ENS profile. Try again in a moment.');
+            return false;
+        }
+
         if (!amount || !/^\d+(\.\d+)?$/.test(amount) || parseFloat(amount) <= 0) {
             Alert.alert('Invalid Amount', 'Please enter a valid number (e.g. 1.50).');
-            return;
+            return false;
         }
 
         if (!walletAddress.trim()) {
             Alert.alert('Missing Address', 'Please enter a wallet address (0x...) or ENS name (.eth).');
-            return;
+            return false;
         }
 
-        // Validate: must be a valid address OR an ENS name
-        const isEns = walletAddress.endsWith('.eth');
-        if (!isEns && !ethers.isAddress(walletAddress)) {
-            Alert.alert('Invalid Address', 'Please enter a valid Ethereum address (0x...) or ENS name (.eth).');
-            return;
-        }
+        return true;
+    }, [amount, walletAddress, isConnected, connectedAddress, resolvingWallet]);
 
-        // Build payload — pass ENS directly, customer resolves on their side
+    const buildPaymentPayload = useCallback(async () => {
+        const rawWalletInput = (connectedEnsName || connectedAddress || '').trim();
         const chainConfig = CHAINS[selectedChain];
-        const payload = {
-            version: 1,
-            merchant: merchantName,
-            amount: amount,
-            token: selectedToken,
-            decimals: selectedToken === 'USDC' ? 6 : 18,
-            chain: selectedChain,
-            chainId: chainConfig.hexChainId,
-            timestamp: new Date().toISOString(),
-        };
-        if (isEns) {
-            payload.ens = walletAddress;
+
+        const isEnsInput = rawWalletInput.toLowerCase().endsWith('.eth');
+        let resolvedWalletAddress = null;
+        let ensName = null;
+
+        if (isEnsInput) {
+            ensName = rawWalletInput.toLowerCase();
+            resolvedWalletAddress = await resolveENS(ensName);
+            if (!resolvedWalletAddress) {
+                throw new Error(`Could not resolve ENS name "${rawWalletInput}".`);
+            }
         } else {
-            payload.wallet = walletAddress;
+            if (!ethers.isAddress(rawWalletInput)) {
+                throw new Error('Please enter a valid Ethereum address (0x...) or ENS name (.eth).');
+            }
+            resolvedWalletAddress = ethers.getAddress(rawWalletInput);
+            ensName = await resolvePrimaryENS(resolvedWalletAddress);
         }
 
-        const paymentData = JSON.stringify(payload);
+        return {
+            version: 2,
+            mode: 'receive-profile',
+            receiverName,
+            ens: ensName || null,
+            wallet: resolvedWalletAddress,
+            preferredChain: selectedChain,
+            preferredToken: selectedToken,
+            suggestedAmount: amount,
+            chainId: chainConfig.hexChainId,
+            decimals: selectedToken === 'USDC' ? 6 : 18,
+            timestamp: new Date().toISOString(),
 
-        if (paymentData.length > 500) {
-            Alert.alert('Payload Too Large', 'Payment data may exceed NFC tag capacity. Try shortening the merchant name.');
+            // Legacy keys retained for backward compatibility.
+            merchant: receiverName,
+            amount,
+            token: selectedToken,
+            chain: selectedChain,
+        };
+    }, [connectedEnsName, connectedAddress, selectedChain, receiverName, amount, selectedToken]);
+
+    const sendPayment = useCallback(async () => {
+        if (!validateInputs()) {
             return;
         }
 
         try {
+            const payload = await buildPaymentPayload();
+            const paymentData = JSON.stringify(payload);
+
+            if (paymentData.length > 500) {
+                Alert.alert('Payload Too Large', 'Payment data may exceed NFC tag capacity. Try shortening the receiver name.');
+                return;
+            }
+
             const supported = await NfcManager.isSupported();
             if (!supported) {
                 Alert.alert('NFC Unavailable', 'This device does not support NFC. You need a physical Android device to write NFC tags.');
@@ -89,9 +178,14 @@ export default function MerchantScreen() {
             await NfcManager.writeNdefMessage(bytes);
 
             setNfcStatus('success');
-            Alert.alert('✅ Success', 'Payment request written! Tap the customer\'s phone now.');
+            Alert.alert('✅ Success', 'Receive profile shared. Person A can now tap and confirm payment.');
         } catch (e) {
             console.warn('NFC Write Error:', e);
+            if (e?.message?.includes('ENS') || e?.message?.includes('valid Ethereum address')) {
+                setNfcStatus('idle');
+                Alert.alert('Invalid Address', e.message);
+                return;
+            }
             setNfcStatus('error');
             Alert.alert('NFC Error', e?.message || 'Failed to write NFC. Make sure NFC is enabled.');
         } finally {
@@ -99,72 +193,85 @@ export default function MerchantScreen() {
                 await NfcManager.cancelTechnologyRequest();
             } catch (_) { }
         }
-    }, [amount, merchantName, walletAddress, selectedToken, selectedChain]);
+    }, [validateInputs, buildPaymentPayload]);
 
     const resetStatus = () => setNfcStatus('idle');
 
     const generateQr = useCallback(async () => {
-        if (!amount || !/^\d+(\.\d+)?$/.test(amount) || parseFloat(amount) <= 0) {
-            Alert.alert('Invalid Amount', 'Please enter a valid number (e.g. 1.50).');
+        if (!validateInputs()) {
             return;
         }
 
-        if (!walletAddress.trim()) {
-            Alert.alert('Missing Address', 'Please enter a wallet address (0x...) or ENS name (.eth).');
-            return;
+        try {
+            const payload = await buildPaymentPayload();
+            setQrPayload(JSON.stringify(payload));
+        } catch (e) {
+            Alert.alert('Invalid Address', e?.message || 'Could not build payment payload.');
         }
-
-        const isEns = walletAddress.endsWith('.eth');
-        if (!isEns && !ethers.isAddress(walletAddress)) {
-            Alert.alert('Invalid Address', 'Please enter a valid Ethereum address (0x...) or ENS name (.eth).');
-            return;
-        }
-
-        const chainConfig = CHAINS[selectedChain];
-        const payload = {
-            version: 1,
-            merchant: merchantName,
-            amount: amount,
-            token: selectedToken,
-            decimals: selectedToken === 'USDC' ? 6 : 18,
-            chain: selectedChain,
-            chainId: chainConfig.hexChainId,
-            timestamp: new Date().toISOString(),
-        };
-        if (isEns) {
-            payload.ens = walletAddress;
-        } else {
-            payload.wallet = walletAddress;
-        }
-
-        setQrPayload(JSON.stringify(payload));
-    }, [amount, merchantName, walletAddress, selectedToken, selectedChain]);
+    }, [validateInputs, buildPaymentPayload]);
 
     return (
         <LinearGradient colors={GRADIENTS.bg} style={styles.container}>
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 {/* Title */}
                 <View style={styles.titleRow}>
-                    <Ionicons name="storefront" size={28} color={COLORS.primary} />
-                    <Text style={styles.title}>Merchant</Text>
+                    <Ionicons name="person-circle-outline" size={28} color={COLORS.primary} />
+                    <Text style={styles.title}>Receive</Text>
                 </View>
-                <Text style={styles.subtitle}>Create a payment request via NFC or QR</Text>
+                <Text style={styles.subtitle}>Person B shares ENS, wallet, and preferred chain</Text>
 
-                {/* Merchant Name */}
-                <Text style={styles.label}>Merchant Name</Text>
+                <View style={styles.strictModeBanner}>
+                    <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.warning} />
+                    <Text style={styles.strictModeText}>Strict mode: only connected wallet identity can be shared.</Text>
+                </View>
+
+                <View style={styles.walletConnectionSection}>
+                    {isConnected ? (
+                        <View style={styles.connectedWalletChip}>
+                            <Ionicons name="wallet" size={16} color={COLORS.success} />
+                            <Text style={styles.connectedWalletText}>
+                                {connectedEnsName || shortenAddress(connectedAddress)}
+                            </Text>
+                            <Text
+                                style={styles.changeWalletLink}
+                                onPress={() => openWallet()}
+                            >
+                                Change
+                            </Text>
+                        </View>
+                    ) : (
+                        <GlassButton
+                            title="Connect Wallet & Auto-fill"
+                            onPress={() => openWallet()}
+                            gradient={[COLORS.secondary, '#b388ff']}
+                            icon={<Ionicons name="wallet-outline" size={20} color="#fff" />}
+                        />
+                    )}
+
+                    {isConnected && (
+                        <Text style={styles.walletConnectionHint}>
+                            {resolvingWallet
+                                ? 'Resolving primary ENS...'
+                                : 'Wallet field is auto-filled from your connected wallet.'}
+                        </Text>
+                    )}
+                </View>
+
+                {/* Receiver Name */}
+                <Text style={styles.label}>Receiver Name</Text>
                 <View style={styles.inputContainer}>
-                    <Ionicons name="business-outline" size={18} color={COLORS.textMuted} />
+                    <Ionicons name="person-outline" size={18} color={COLORS.textMuted} />
                     <TextInput
                         style={styles.input}
-                        value={merchantName}
-                        onChangeText={setMerchantName}
+                        value={receiverName}
+                        onChangeText={setReceiverName}
                         placeholderTextColor={COLORS.textMuted}
-                        placeholder="Your business name"
+                        placeholder="Receiver display name"
                     />
                 </View>
 
                 {/* Wallet */}
-                <Text style={styles.label}>Wallet Address or ENS Name</Text>
+                <Text style={styles.label}>Receiver ENS or Wallet</Text>
                 <View style={styles.inputContainer}>
                     <Ionicons name="wallet-outline" size={18} color={COLORS.textMuted} />
                     <TextInput
@@ -172,13 +279,14 @@ export default function MerchantScreen() {
                         value={walletAddress}
                         onChangeText={setWalletAddress}
                         placeholderTextColor={COLORS.textMuted}
-                        placeholder="0x... or name.eth"
+                        placeholder="Connect wallet to auto-fill"
                         autoCapitalize="none"
+                        editable={false}
                     />
                 </View>
 
                 {/* Chain Selector */}
-                <Text style={styles.label}>Network</Text>
+                <Text style={styles.label}>Preferred Network</Text>
                 <View style={styles.tokenRow}>
                     {CHAIN_KEYS.map((key) => (
                         <TouchableOpacity
@@ -202,7 +310,7 @@ export default function MerchantScreen() {
                 </View>
 
                 {/* Token Selector */}
-                <Text style={styles.label}>Token</Text>
+                <Text style={styles.label}>Preferred Token</Text>
                 <View style={styles.tokenRow}>
                     {TOKENS.map((t) => (
                         <TouchableOpacity
@@ -226,7 +334,7 @@ export default function MerchantScreen() {
                 </View>
 
                 {/* Amount */}
-                <Text style={styles.label}>Amount</Text>
+                <Text style={styles.label}>Requested Amount</Text>
                 <View style={styles.inputContainer}>
                     <Text style={styles.dollarSign}>$</Text>
                     <TextInput
@@ -252,16 +360,16 @@ export default function MerchantScreen() {
                         }
                     />
                     <Text style={styles.statusText}>
-                        {nfcStatus === 'idle' && 'Ready to send'}
-                        {nfcStatus === 'writing' && 'Hold near customer\'s phone...'}
-                        {nfcStatus === 'success' && 'Payment request sent!'}
+                        {nfcStatus === 'idle' && 'Ready to share receive profile'}
+                        {nfcStatus === 'writing' && 'Hold near Person A phone...'}
+                        {nfcStatus === 'success' && 'Receive profile shared!'}
                         {nfcStatus === 'error' && 'Failed — try again'}
                     </Text>
                 </View>
 
                 {/* Send Button */}
                 <GlassButton
-                    title="Send Payment via NFC"
+                    title="Share Receive Profile via NFC"
                     onPress={nfcStatus === 'success' ? resetStatus : sendPayment}
                     icon={
                         <Ionicons
@@ -279,6 +387,12 @@ export default function MerchantScreen() {
                     style={{ marginTop: SPACING.md }}
                 />
 
+                {!receiverReady && (
+                    <Text style={styles.strictModeHelp}>
+                        Connect wallet first to enable profile sharing.
+                    </Text>
+                )}
+
                 {/* QR Code Fallback */}
                 <View style={styles.divider}>
                     <View style={styles.dividerLine} />
@@ -291,12 +405,13 @@ export default function MerchantScreen() {
                     onPress={generateQr}
                     gradient={[COLORS.secondary, '#b388ff']}
                     icon={<Ionicons name="qr-code-outline" size={22} color="#fff" />}
+                    disabled={!receiverReady}
                     style={{ marginTop: SPACING.sm }}
                 />
 
                 {qrPayload && (
                     <View style={styles.qrCard}>
-                        <Text style={styles.qrTitle}>📱 Customer scans this QR</Text>
+                        <Text style={styles.qrTitle}>📱 Person A scans this QR</Text>
                         <View style={styles.qrContainer}>
                             <QRCode
                                 value={qrPayload}
@@ -305,7 +420,7 @@ export default function MerchantScreen() {
                                 color={COLORS.text}
                             />
                         </View>
-                        <Text style={styles.qrHint}>Customer opens app → Scan QR → Pay</Text>
+                        <Text style={styles.qrHint}>Person A opens Send tab | Scan QR | Confirm</Text>
                     </View>
                 )}
 
@@ -315,15 +430,19 @@ export default function MerchantScreen() {
                     <Text style={styles.previewJson}>
                         {JSON.stringify(
                             {
-                                version: 1,
-                                merchant: merchantName,
-                                ...(walletAddress.endsWith('.eth')
-                                    ? { ens: walletAddress }
-                                    : { wallet: walletAddress }),
-                                amount: amount || '0',
-                                token: selectedToken,
+                                version: 2,
+                                mode: 'receive-profile',
+                                receiverName,
+                                ens: walletAddress.toLowerCase().endsWith('.eth')
+                                    ? walletAddress
+                                    : connectedEnsName,
+                                wallet: walletAddress.toLowerCase().endsWith('.eth')
+                                    ? 'resolved-on-send'
+                                    : walletAddress,
+                                suggestedAmount: amount || '0',
+                                preferredToken: selectedToken,
                                 decimals: selectedToken === 'USDC' ? 6 : 18,
-                                chain: CHAINS[selectedChain].name,
+                                preferredChain: CHAINS[selectedChain].name,
                                 chainId: CHAINS[selectedChain].hexChainId,
                             },
                             null,
@@ -360,6 +479,24 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         fontSize: FONT.size.md,
         marginBottom: SPACING.xl,
+    },
+    strictModeBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.xs,
+        alignSelf: 'flex-start',
+        backgroundColor: COLORS.warning + '1A',
+        borderWidth: 1,
+        borderColor: COLORS.warning + '66',
+        borderRadius: RADIUS.full,
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.xs,
+        marginBottom: SPACING.lg,
+    },
+    strictModeText: {
+        color: COLORS.warning,
+        fontSize: FONT.size.xs,
+        ...FONT.medium,
     },
     label: {
         color: COLORS.textSecondary,
@@ -434,6 +571,44 @@ const styles = StyleSheet.create({
     statusText: {
         color: COLORS.textSecondary,
         fontSize: FONT.size.sm,
+        marginTop: SPACING.sm,
+    },
+    walletConnectionSection: {
+        marginBottom: SPACING.md,
+    },
+    connectedWalletChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'center',
+        gap: SPACING.sm,
+        backgroundColor: COLORS.glass,
+        borderWidth: 1,
+        borderColor: COLORS.success,
+        borderRadius: RADIUS.full,
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
+    },
+    connectedWalletText: {
+        color: COLORS.success,
+        fontSize: FONT.size.sm,
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    },
+    changeWalletLink: {
+        color: COLORS.textMuted,
+        fontSize: FONT.size.sm,
+        marginLeft: SPACING.xs,
+        textDecorationLine: 'underline',
+    },
+    walletConnectionHint: {
+        color: COLORS.textMuted,
+        fontSize: FONT.size.xs,
+        marginTop: SPACING.sm,
+        textAlign: 'center',
+    },
+    strictModeHelp: {
+        color: COLORS.warning,
+        fontSize: FONT.size.xs,
+        textAlign: 'center',
         marginTop: SPACING.sm,
     },
     previewCard: {

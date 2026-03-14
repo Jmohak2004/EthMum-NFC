@@ -1,6 +1,15 @@
 import { ethers } from 'ethers';
+import { createEnsPublicClient } from '@ensdomains/ensjs';
+import { http } from 'viem';
+import { mainnet } from 'viem/chains';
 import { DEMO_PRIVATE_KEY } from '@env';
 import { CONTRACTS, ERC20_ABI, EXPLORER, CHAINS, DEFAULT_CHAIN, getChainConfig, getUSDCAddress } from '../config/blockchain';
+
+const ENS_RPC_URL = 'https://eth.llamarpc.com';
+const ensPublicClient = createEnsPublicClient({
+    chain: mainnet,
+    transport: http(ENS_RPC_URL),
+});
 
 // ─── Provider ────────────────────────────────────────────────────────
 export function getProvider(chainKey) {
@@ -100,61 +109,87 @@ export async function sendUSDC(toAddress, amountInUSDC, chainKey) {
 // ─── ENS Resolution ─────────────────────────────────────────────────
 export async function resolveENS(ensName) {
     try {
-        // ENS resolution requires mainnet provider
-        const mainnetProvider = new ethers.JsonRpcProvider(
-            'https://eth.llamarpc.com'
-        );
-        const address = await mainnetProvider.resolveName(ensName);
+        const record = await ensPublicClient.getAddressRecord({
+            name: ensName,
+            coin: 'ETH',
+        });
+        const address = record?.value || null;
         return address;
     } catch (e) {
-        console.warn('ENS resolution failed:', e);
+        // Fallback keeps ENS support resilient if ENS.js provider calls fail.
+        try {
+            const mainnetProvider = new ethers.JsonRpcProvider(ENS_RPC_URL);
+            return await mainnetProvider.resolveName(ensName);
+        } catch (fallbackErr) {
+            console.warn('ENS resolution failed:', e, fallbackErr);
+            return null;
+        }
+    }
+}
+
+export async function resolvePrimaryENS(address) {
+    try {
+        const checksummedAddress = ethers.getAddress(address);
+        const result = await ensPublicClient.getName({
+            address: checksummedAddress,
+        });
+        if (result?.match && result?.name) {
+            return result.name;
+        }
         return null;
+    } catch (e) {
+        try {
+            const mainnetProvider = new ethers.JsonRpcProvider(ENS_RPC_URL);
+            return await mainnetProvider.lookupAddress(address);
+        } catch (fallbackErr) {
+            console.warn('ENS reverse lookup failed:', e, fallbackErr);
+            return null;
+        }
     }
 }
 
 // ─── ENS Profile (avatar + reverse name + text records) ─────────────
 export async function resolveENSProfile(ensNameOrAddress) {
     try {
-        const mainnetProvider = new ethers.JsonRpcProvider(
-            'https://eth.llamarpc.com'
-        );
+        const mainnetProvider = new ethers.JsonRpcProvider(ENS_RPC_URL);
 
         let address = ensNameOrAddress;
         let ensName = null;
 
         if (ensNameOrAddress.endsWith('.eth')) {
             ensName = ensNameOrAddress;
-            address = await mainnetProvider.resolveName(ensName);
+            address = await resolveENS(ensName);
             if (!address) return null;
         } else {
-            // Reverse lookup: address → name.eth
-            ensName = await mainnetProvider.lookupAddress(ensNameOrAddress);
+            ensName = await resolvePrimaryENS(ensNameOrAddress);
         }
 
-        // Fetch avatar
         let avatar = null;
+        let textRecords = {};
+
         if (ensName) {
             try {
-                avatar = await mainnetProvider.getAvatar(ensName);
+                const fields = ['avatar', 'description', 'url', 'com.twitter', 'com.github', 'email'];
+                const recordResult = await ensPublicClient.getRecords({
+                    name: ensName,
+                    texts: fields,
+                });
+
+                const textArray = recordResult?.texts || [];
+                for (const entry of textArray) {
+                    if (!entry?.key || !entry?.value) continue;
+                    if (entry.key === 'avatar') {
+                        avatar = entry.value;
+                    } else {
+                        textRecords[entry.key] = entry.value;
+                    }
+                }
             } catch (_) { }
         }
 
-        // Fetch ENS text records (description, website, twitter, etc.)
-        let textRecords = {};
-        if (ensName) {
+        if (!avatar && ensName) {
             try {
-                const resolver = await mainnetProvider.getResolver(ensName);
-                if (resolver) {
-                    const fields = ['description', 'url', 'com.twitter', 'com.github', 'email'];
-                    const results = await Promise.allSettled(
-                        fields.map((field) => resolver.getText(field))
-                    );
-                    fields.forEach((field, i) => {
-                        if (results[i].status === 'fulfilled' && results[i].value) {
-                            textRecords[field] = results[i].value;
-                        }
-                    });
-                }
+                avatar = await mainnetProvider.getAvatar(ensName);
             } catch (_) { }
         }
 

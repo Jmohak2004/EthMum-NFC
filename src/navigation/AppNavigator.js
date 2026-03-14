@@ -13,8 +13,8 @@ import HistoryScreen from '../screens/HistoryScreen';
 const Tab = createBottomTabNavigator();
 
 const TAB_CONFIG = {
-    Merchant: { icon: 'storefront', color: COLORS.primary },
-    Customer: { icon: 'scan-outline', color: COLORS.secondary },
+    Receive: { icon: 'download-outline', color: COLORS.primary },
+    Send: { icon: 'send-outline', color: COLORS.secondary },
     History: { icon: 'time-outline', color: COLORS.warning },
 };
 
@@ -51,8 +51,8 @@ export default function AppNavigator() {
                     tabBarItemStyle: styles.tabItem,
                 })}
             >
-                <Tab.Screen name="Merchant" component={MerchantScreen} />
-                <Tab.Screen name="Customer" component={CustomerScreen} />
+                <Tab.Screen name="Receive" component={MerchantScreen} />
+                <Tab.Screen name="Send" component={CustomerScreen} />
                 <Tab.Screen name="History" component={HistoryScreen} />
             </Tab.Navigator>
         </NavigationContainer>

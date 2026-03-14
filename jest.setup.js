@@ -68,6 +68,35 @@ jest.mock('@reown/appkit-ethers-react-native', () => ({
 
 jest.mock('@walletconnect/react-native-compat', () => ({}));
 
+jest.mock('viem', () => ({
+    http: jest.fn(() => ({ type: 'http' })),
+}));
+
+jest.mock('viem/chains', () => ({
+    mainnet: { id: 1, name: 'Ethereum' },
+}));
+
+jest.mock('@ensdomains/ensjs', () => ({
+    createEnsPublicClient: jest.fn(() => ({
+        getAddressRecord: jest.fn().mockResolvedValue({
+            id: 60,
+            name: 'ETH',
+            value: '0xResolvedENSAddress',
+        }),
+        getName: jest.fn().mockResolvedValue({
+            name: 'resolved.eth',
+            match: true,
+        }),
+        getRecords: jest.fn().mockResolvedValue({
+            texts: [
+                { key: 'avatar', value: 'https://avatar.link' },
+                { key: 'description', value: 'Mock record' },
+                { key: 'url', value: 'https://example.com' },
+            ],
+        }),
+    })),
+}));
+
 // ─── Expo Vector Icons Mock ─────────────────────────────────────────────
 jest.mock('@expo/vector-icons', () => {
     const React = require('react');

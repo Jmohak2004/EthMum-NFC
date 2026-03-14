@@ -6,8 +6,9 @@ import { COLORS, SPACING, RADIUS, FONT, SHADOWS } from '../theme';
 import { shortenAddress } from '../utils/wallet';
 import { getChainConfig } from '../config/blockchain';
 
-export default function PaymentCard({ merchant, wallet, amount, token, txHash, timestamp, ensName, avatar, chain, textRecords }) {
+export default function PaymentCard({ merchant, counterparty, wallet, amount, token, txHash, timestamp, ensName, avatar, chain, textRecords }) {
     const hasProfile = textRecords && Object.keys(textRecords).length > 0;
+    const counterpartyLabel = counterparty || merchant || 'Unknown';
     return (
         <View style={styles.container}>
             <LinearGradient
@@ -38,8 +39,8 @@ export default function PaymentCard({ merchant, wallet, amount, token, txHash, t
                 {/* Header */}
                 <View style={styles.header}>
                     <View style={styles.merchantBadge}>
-                        <Ionicons name="storefront" size={18} color={COLORS.primary} />
-                        <Text style={styles.merchantName}>{merchant || 'Unknown'}</Text>
+                        <Ionicons name="person-circle-outline" size={18} color={COLORS.primary} />
+                        <Text style={styles.merchantName}>{counterpartyLabel}</Text>
                     </View>
                     <View style={styles.badgeRow}>
                         {chain && (
@@ -86,12 +87,12 @@ export default function PaymentCard({ merchant, wallet, amount, token, txHash, t
                     </Text>
                 ) : null}
 
-                {/* Merchant Profile (ENS Text Records) */}
+                {/* ENS Profile (Text Records) */}
                 {hasProfile && (
                     <View style={styles.profileSection}>
                         <View style={styles.profileHeader}>
                             <Ionicons name="information-circle-outline" size={14} color={COLORS.primary} />
-                            <Text style={styles.profileTitle}>Merchant Profile</Text>
+                            <Text style={styles.profileTitle}>ENS Profile</Text>
                         </View>
                         {textRecords.description && (
                             <Text style={styles.profileDescription}>{textRecords.description}</Text>
