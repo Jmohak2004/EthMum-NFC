@@ -75,7 +75,7 @@ export default function HistoryScreen() {
                 >
                     <Ionicons name="open-outline" size={14} color={COLORS.primary} />
                     <Text style={styles.explorerBtnText}>
-                        View on {item.chain ? getChainConfig(item.chain).name : 'Base'} Explorer
+                        View on {item.chain ? getChainConfig(item.chain).name : 'Sepolia'} Explorer
                     </Text>
                 </TouchableOpacity>
             )}

@@ -147,7 +147,7 @@ jest.mock('ethers', () => {
     };
 
     const BrowserProviderMock = jest.fn().mockImplementation(() => ({
-        getNetwork: jest.fn().mockResolvedValue({ chainId: 84532n }), // Base Sepolia
+        getNetwork: jest.fn().mockResolvedValue({ chainId: 11155111n }), // Sepolia
         getSigner: jest.fn().mockResolvedValue(mockSigner)
     }));
 

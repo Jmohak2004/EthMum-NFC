@@ -154,6 +154,11 @@ export default function MerchantScreen() {
             return;
         }
 
+        if (paymentData.length > 500) {
+            Alert.alert('Payload Too Large', 'Payment data may exceed NFC tag capacity. Try shortening the merchant name.');
+            return;
+        }
+
         try {
             const payload = await buildPaymentPayload();
             const paymentData = JSON.stringify(payload);

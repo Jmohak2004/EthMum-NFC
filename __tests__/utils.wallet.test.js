@@ -30,14 +30,14 @@ describe('wallet.js Blockchain Utilities', () => {
 
     describe('Demo Wallet Operations', () => {
         it('sends ETH using the demo wallet fallback', async () => {
-            const result = await sendETH('0xRecipientAddress', '1.0', 'base-sepolia');
+            const result = await sendETH('0xRecipientAddress', '1.0', 'sepolia');
             expect(result.hash).toBe('0xMockTxHash');
             expect(result.token).toBe('ETH');
             expect(result.amount).toBe('1.0');
         });
 
         it('sends USDC using the demo wallet fallback', async () => {
-            const result = await sendUSDC('0xRecipientAddress', '10', 'base-sepolia');
+            const result = await sendUSDC('0xRecipientAddress', '10', 'sepolia');
             expect(result.hash).toBe('0xMockUSDCHash');
             expect(result.token).toBe('USDC');
             expect(result.amount).toBe('10');
@@ -48,19 +48,19 @@ describe('wallet.js Blockchain Utilities', () => {
         const mockWalletProvider = { request: jest.fn().mockResolvedValue() };
 
         it('ensures correct chain by requesting network switch', async () => {
-            await ensureCorrectChain(mockWalletProvider, 'base-sepolia');
+            await ensureCorrectChain(mockWalletProvider, 'sepolia');
             // Mock BrowserProvider returns chainId 84532 so it matches natively in our tests.
             // If it matches, switch doesn't get called.
             expect(mockWalletProvider.request).not.toHaveBeenCalled();
         });
 
         it('sends ETH via connected wallet provider', async () => {
-            const result = await sendETHViaProvider(mockWalletProvider, '0xRecipientAddress', '1.0', 'base-sepolia');
+            const result = await sendETHViaProvider(mockWalletProvider, '0xRecipientAddress', '1.0', 'sepolia');
             expect(result.hash).toBe('0xMockWalletConnectTxHash');
         });
 
         it('sends USDC via connected wallet provider', async () => {
-            const result = await sendUSDCViaProvider(mockWalletProvider, '0xRecipientAddress', '10', 'base-sepolia');
+            const result = await sendUSDCViaProvider(mockWalletProvider, '0xRecipientAddress', '10', 'sepolia');
             expect(result.hash).toBe('0xMockUSDCHash');
         });
     });

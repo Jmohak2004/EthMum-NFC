@@ -93,7 +93,18 @@ describe('CustomerScreen', () => {
         fireEvent.press(getByText('Read Receiver via NFC'));
 
         await waitFor(() => {
-            expect(getByText('Confirm & Send')).toBeTruthy();
+            // Transaction Confirmed state
+            expect(getByText('Transaction Confirmed')).toBeTruthy();
+            expect(getByText('View on Sepolia Explorer')).toBeTruthy();
+        });
+    });
+
+    it('executes external provider chain interaction if authenticated', async () => {
+        useAccount.mockReturnValueOnce({ address: '0xMockConnectedWallet', isConnected: true });
+
+        Ndef.text.decodePayload.mockReturnValueOnce(mockStringifiedPayload);
+        NfcManager.getTag.mockResolvedValueOnce({
+            ndefMessage: [{ payload: [1, 2, 3] }]
         });
 
         fireEvent.press(getByText('Confirm & Send'));
