@@ -73,8 +73,8 @@ const projectId = WALLETCONNECT_PROJECT_ID || 'your_project_id';
 // Create and export the AppKit instance
 export const appKit = createAppKit({
     projectId,
-    networks: [baseSepolia, sepolia],
-    defaultNetwork: baseSepolia,
+    networks: [sepolia, baseSepolia],
+    defaultNetwork: sepolia,
     adapters: [ethersAdapter],
     storage: appKitStorage,
     metadata: {

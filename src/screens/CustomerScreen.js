@@ -154,7 +154,7 @@ export default function CustomerScreen() {
 
             let result;
 
-            const chainKey = payment.chain || 'base-sepolia';
+            const chainKey = payment.chain || 'sepolia';
             const chainName = getChainConfig(chainKey).name;
 
             // Use connected wallet if available, otherwise fall back to demo wallet
@@ -336,7 +336,7 @@ export default function CustomerScreen() {
                                         >
                                             {pendingHash.slice(0, 10)}...{pendingHash.slice(-8)}
                                         </Text>
-                                        <Text style={styles.hashHint}>Tap to view on Base Explorer</Text>
+                                        <Text style={styles.hashHint}>Tap to view on Sepolia Etherscan</Text>
                                     </View>
                                 )}
                             </View>
@@ -393,7 +393,7 @@ export default function CustomerScreen() {
                         />
 
                         <GlassButton
-                            title="View on Base Explorer"
+                            title="View on Sepolia Etherscan"
                             onPress={() => Linking.openURL(getEtherscanUrl(txResult.hash, payment?.chain))}
                             gradient={GRADIENTS.primary}
                             icon={<Ionicons name="open-outline" size={20} color="#fff" />}

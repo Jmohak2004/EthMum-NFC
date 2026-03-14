@@ -10,8 +10,8 @@ const mockPaymentData = {
     amount: '50',
     token: 'USDC',
     decimals: 6,
-    chain: 'base-sepolia',
-    chainId: '0x14a34',
+    chain: 'sepolia',
+    chainId: '0xaa36a7',
     timestamp: '2026-03-14T00:00:00.000Z',
     ens: 'vitalik.eth'
 };
@@ -102,7 +102,7 @@ describe('CustomerScreen', () => {
         await waitFor(() => {
             // Transaction Confirmed state
             expect(getByText('Transaction Confirmed')).toBeTruthy();
-            expect(getByText('View on Base Explorer')).toBeTruthy();
+            expect(getByText('View on Sepolia Explorer')).toBeTruthy();
         });
     });
 

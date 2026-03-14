@@ -35,7 +35,7 @@ export const CHAINS = {
 };
 
 export const CHAIN_KEYS = Object.keys(CHAINS);
-export const DEFAULT_CHAIN = 'base-sepolia';
+export const DEFAULT_CHAIN = 'sepolia';
 
 // Legacy compat — used by MerchantScreen default
 export const NETWORK = DEFAULT_CHAIN;
