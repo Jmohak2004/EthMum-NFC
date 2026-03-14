@@ -411,7 +411,7 @@ export default function CustomerScreen() {
                                         >
                                             {pendingHash.slice(0, 10)}...{pendingHash.slice(-8)}
                                         </Text>
-                                        <Text style={styles.hashHint}>Tap to view on Base Explorer</Text>
+                                        <Text style={styles.hashHint}>Tap to view on Sepolia Etherscan</Text>
                                     </View>
                                 )}
                             </View>
