@@ -3,6 +3,8 @@
 > Hackathon-ready React Native (Expo) app for **NFC tag-based crypto payments** on Ethereum.
 
 Architecture Diagram :
+## Architecture Diagram
+![EthMum Architecture](./WhatsApp%20Image%202026-03-15%20at%2013.39.06.jpeg)
 
 ## 🔥 Features
 
