@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
         borderWidth: 2,
     },
     iconCircle: {
-        backgroundColor: 'rgba(0,229,255,0.08)',
+        backgroundColor: COLORS.yellowDim,
         alignItems: 'center',
         justifyContent: 'center',
     },

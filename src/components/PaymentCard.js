@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT, SHADOWS } from '../theme';
+import { COLORS, SPACING, RADIUS, FONT, SHADOWS, GRADIENTS } from '../theme';
 import { shortenAddress } from '../utils/wallet';
 import { getChainConfig } from '../config/blockchain';
 
@@ -12,7 +12,7 @@ export default function PaymentCard({ merchant, counterparty, wallet, amount, to
     return (
         <View style={styles.container}>
             <LinearGradient
-                colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)']}
+                colors={GRADIENTS.card}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.gradient}

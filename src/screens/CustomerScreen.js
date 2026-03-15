@@ -273,14 +273,18 @@ export default function CustomerScreen() {
             <ScrollView contentContainerStyle={styles.scroll}>
                 {/* Title */}
                 <View style={styles.titleRow}>
-                    <Ionicons name="send-outline" size={28} color={COLORS.secondary} />
+                    <Ionicons name="send-outline" size={28} color={COLORS.primary} />
                     <Text style={styles.title}>Send</Text>
                 </View>
                 <Text style={styles.subtitle}>Person A taps Person B to receive ENS + wallet + preferred chain</Text>
 
-                <View style={styles.strictModeBanner}>
-                    <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.warning} />
-                    <Text style={styles.strictModeText}>Strict flow: connect wallet, tap receiver, then confirm transaction.</Text>
+                <View style={styles.spendingNote}>
+                    <View style={styles.spendingNoteIcon}>
+                        <Ionicons name="shield-checkmark-outline" size={18} color={COLORS.textDark} />
+                    </View>
+                    <Text style={styles.spendingBody}>
+                        <Text style={styles.spendingBold}>Strict flow:</Text> connect wallet, tap receiver, then confirm transaction.
+                    </Text>
                 </View>
 
                 <View style={styles.walletSectionTop}>
@@ -301,8 +305,8 @@ export default function CustomerScreen() {
                         <GlassButton
                             title="Connect Wallet to Start"
                             onPress={() => openWallet()}
-                            gradient={[COLORS.secondary, '#b388ff']}
-                            icon={<Ionicons name="wallet-outline" size={20} color="#fff" />}
+                            gradient={GRADIENTS.primary}
+                            icon={<Ionicons name="wallet-outline" size={20} color={COLORS.textDark} />}
                         />
                     )}
 
@@ -315,40 +319,43 @@ export default function CustomerScreen() {
 
                 {/* NFC Scan Area */}
                 {!payment && !qrScanning && (
-                    <View style={styles.scanSection}>
-                        <NfcPulse
-                            active={scanning}
-                            color={COLORS.secondary}
-                            size={90}
-                        />
-                        <Text style={styles.scanLabel}>
-                            {scanning ? 'Scanning for receiver profile...' : 'Tap Person B phone or scan QR'}
-                        </Text>
-                        {!scanning && (
-                            <>
-                                <GlassButton
-                                    title="Read Receiver via NFC"
-                                    onPress={readNfc}
-                                    gradient={[COLORS.secondary, '#b388ff']}
-                                    icon={<Ionicons name="radio-outline" size={20} color="#fff" />}
-                                    disabled={!senderReady}
-                                    style={{ marginTop: SPACING.lg }}
-                                />
-                                <View style={styles.divider}>
-                                    <View style={styles.dividerLine} />
-                                    <Text style={styles.dividerText}>OR</Text>
-                                    <View style={styles.dividerLine} />
-                                </View>
-                                <GlassButton
-                                    title="Scan QR Code"
-                                    onPress={openQrScanner}
-                                    gradient={[COLORS.primary, '#00b8d4']}
-                                    icon={<Ionicons name="qr-code-outline" size={20} color="#fff" />}
-                                    disabled={!senderReady}
-                                    style={{ marginTop: SPACING.md }}
-                                />
-                            </>
-                        )}
+                    <View style={styles.scanCard}>
+                        <View style={styles.panelHandle} />
+                        <View style={styles.scanSection}>
+                            <NfcPulse
+                                active={scanning}
+                                color={COLORS.primary}
+                                size={90}
+                            />
+                            <Text style={styles.scanLabel}>
+                                {scanning ? 'Scanning for receiver profile...' : 'Tap Person B phone or scan QR'}
+                            </Text>
+                            {!scanning && (
+                                <>
+                                    <GlassButton
+                                        title="Read Receiver via NFC"
+                                        onPress={readNfc}
+                                        gradient={GRADIENTS.primary}
+                                        icon={<Ionicons name="radio-outline" size={20} color={COLORS.textDark} />}
+                                        disabled={!senderReady}
+                                        style={{ marginTop: SPACING.lg }}
+                                    />
+                                    <View style={styles.divider}>
+                                        <View style={styles.dividerLine} />
+                                        <Text style={styles.dividerText}>OR</Text>
+                                        <View style={styles.dividerLine} />
+                                    </View>
+                                    <GlassButton
+                                        title="Scan QR Code"
+                                        onPress={openQrScanner}
+                                        gradient={GRADIENTS.primary}
+                                        icon={<Ionicons name="qr-code-outline" size={20} color={COLORS.textDark} />}
+                                        disabled={!senderReady}
+                                        style={{ marginTop: SPACING.md }}
+                                    />
+                                </>
+                            )}
+                        </View>
                     </View>
                 )}
 
@@ -411,7 +418,7 @@ export default function CustomerScreen() {
                                         >
                                             {pendingHash.slice(0, 10)}...{pendingHash.slice(-8)}
                                         </Text>
-                                        <Text style={styles.hashHint}>Tap to view on Sepolia Etherscan</Text>
+                                        <Text style={styles.hashHint}>Tap to view on {getChainConfig(payment?.preferredChain || payment?.chain || 'base-sepolia').name} Explorer</Text>
                                     </View>
                                 )}
                             </View>
@@ -426,7 +433,7 @@ export default function CustomerScreen() {
                                 <Ionicons
                                     name={sending ? 'hourglass-outline' : 'send'}
                                     size={20}
-                                    color="#fff"
+                                    color={COLORS.white}
                                 />
                             }
                             style={{ marginTop: SPACING.md }}
@@ -468,10 +475,10 @@ export default function CustomerScreen() {
                         />
 
                         <GlassButton
-                            title="View on Base Explorer"
+                            title={`View on ${getChainConfig(payment?.preferredChain || payment?.chain || 'base-sepolia').name} Explorer`}
                             onPress={() => Linking.openURL(getEtherscanUrl(txResult.hash, payment?.preferredChain || payment?.chain))}
                             gradient={GRADIENTS.primary}
-                            icon={<Ionicons name="open-outline" size={20} color="#fff" />}
+                            icon={<Ionicons name="open-outline" size={20} color={COLORS.textDark} />}
                             style={{ marginTop: SPACING.md }}
                         />
 
@@ -535,9 +542,28 @@ const styles = StyleSheet.create({
     walletSectionTop: {
         marginBottom: SPACING.md,
     },
+    scanCard: {
+        backgroundColor: COLORS.darkCard,
+        borderRadius: RADIUS.xl,
+        padding: SPACING.xl,
+        marginTop: SPACING.md,
+        marginBottom: SPACING.md,
+        borderWidth: 1,
+        borderColor: COLORS.darkBorder,
+        width: '100%',
+        alignItems: 'center',
+    },
+    panelHandle: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: COLORS.darkSurface,
+        alignSelf: 'center',
+        marginBottom: SPACING.lg,
+    },
     scanSection: {
         alignItems: 'center',
-        paddingVertical: SPACING.xxl,
+        paddingVertical: SPACING.sm,
     },
     scanLabel: {
         color: COLORS.textSecondary,
@@ -678,5 +704,32 @@ const styles = StyleSheet.create({
         fontSize: FONT.size.xs,
         textAlign: 'center',
         marginTop: SPACING.sm,
+    },
+    spendingNote: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: SPACING.sm,
+        backgroundColor: COLORS.yellowLight,
+        borderRadius: RADIUS.lg,
+        padding: SPACING.md,
+        marginBottom: SPACING.lg,
+    },
+    spendingNoteIcon: {
+        width: 28,
+        height: 28,
+        borderRadius: RADIUS.sm,
+        backgroundColor: COLORS.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    spendingBody: {
+        flex: 1,
+        fontSize: FONT.size.md,
+        color: COLORS.textDark,
+        lineHeight: 20,
+    },
+    spendingBold: {
+        fontWeight: '700',
+        color: COLORS.textDark,
     },
 });
