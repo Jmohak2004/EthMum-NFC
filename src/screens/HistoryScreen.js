@@ -19,8 +19,11 @@ import GlassButton from '../components/GlassButton';
 import { getTransactions, clearTransactions } from '../utils/storage';
 import { getEtherscanUrl } from '../utils/wallet';
 import { getChainConfig } from '../config/blockchain';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TAB_BAR_EXTRA_PADDING, MIN_TOUCH_TARGET } from '../utils/responsive';
 
 export default function HistoryScreen() {
+    const insets = useSafeAreaInsets();
     const [transactions, setTransactions] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -85,7 +88,7 @@ export default function HistoryScreen() {
     return (
         <LinearGradient colors={GRADIENTS.bg} style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: Math.max(insets.top, 44) + SPACING.sm }]}>
                 <View style={styles.titleRow}>
                     <Ionicons name="time-outline" size={28} color={COLORS.warning} />
                     <Text style={styles.title}>History</Text>
@@ -108,7 +111,10 @@ export default function HistoryScreen() {
                     data={transactions}
                     keyExtractor={(item, index) => item.hash || `tx-${index}`}
                     renderItem={renderItem}
-                    contentContainerStyle={styles.list}
+                    contentContainerStyle={[
+                        styles.list,
+                        { paddingBottom: insets.bottom + TAB_BAR_EXTRA_PADDING },
+                    ]}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
@@ -119,7 +125,7 @@ export default function HistoryScreen() {
                     showsVerticalScrollIndicator={false}
                 />
             ) : (
-                <View style={styles.emptyState}>
+                <View style={[styles.emptyState, { paddingBottom: insets.bottom + 60 }]}>
                     <View style={styles.spendingNote}>
                         <View style={styles.spendingNoteIcon}>
                             <Ionicons name="receipt-outline" size={24} color={COLORS.textDark} />
@@ -150,7 +156,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: SPACING.lg,
-        paddingTop: Platform.OS === 'android' ? 50 : 60,
     },
     titleRow: {
         flexDirection: 'row',
@@ -171,6 +176,10 @@ const styles = StyleSheet.create({
     },
     clearBtn: {
         padding: SPACING.sm,
+        minWidth: 44,
+        minHeight: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
         backgroundColor: COLORS.dangerDim,
         borderRadius: RADIUS.full,
     },
@@ -220,6 +229,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: SPACING.xs,
+        minHeight: 44,
         backgroundColor: COLORS.primaryDim,
         borderWidth: 1,
         borderColor: COLORS.primary + '30',
