@@ -2,6 +2,8 @@
 
 > Hackathon-ready React Native (Expo) app for **NFC tag-based crypto payments** on Ethereum.
 
+Architecture Diagram :
+
 ## 🔥 Features
 
 - **Merchant Mode** — Enter amount, select token (USDC/ETH), write payment request to a physical NFC tag
