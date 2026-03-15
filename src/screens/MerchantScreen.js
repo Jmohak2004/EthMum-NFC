@@ -8,7 +8,10 @@ import {
     Alert,
     TouchableOpacity,
     Platform,
+    KeyboardAvoidingView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TAB_BAR_EXTRA_PADDING } from '../utils/responsive';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import NfcManager, { Ndef } from '../utils/nfcProxy';
@@ -24,6 +27,7 @@ import { resolveENS, resolvePrimaryENS, shortenAddress } from '../utils/wallet';
 const TOKENS = ['USDC', 'ETH'];
 
 export default function MerchantScreen() {
+    const insets = useSafeAreaInsets();
     const [receiverName, setReceiverName] = useState('Person B');
     const [walletAddress, setWalletAddress] = useState('');
     const [amount, setAmount] = useState('');
@@ -217,7 +221,23 @@ export default function MerchantScreen() {
 
     return (
         <LinearGradient colors={GRADIENTS.bg} style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+            <KeyboardAvoidingView
+                style={styles.container}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+            >
+            <ScrollView
+                contentContainerStyle={[
+                    styles.scroll,
+                    {
+                        paddingTop: Math.max(insets.top, 44) + SPACING.md,
+                        paddingBottom: insets.bottom + TAB_BAR_EXTRA_PADDING,
+                        paddingHorizontal: Math.max(SPACING.lg, insets.left, insets.right),
+                    },
+                ]}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Title */}
                 <View style={styles.titleRow}>
                     <Ionicons name="person-circle-outline" size={28} color={COLORS.primary} />
@@ -468,6 +488,7 @@ export default function MerchantScreen() {
                     </Text>
                 </View>
             </ScrollView>
+            </KeyboardAvoidingView>
         </LinearGradient>
     );
 }

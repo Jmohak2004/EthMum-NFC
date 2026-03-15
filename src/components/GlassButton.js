@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { TouchableOpacity, Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT, SHADOWS, GRADIENTS } from '../theme';
+import { MIN_TOUCH_TARGET } from '../utils/responsive';
 
 export default function GlassButton({
     title,
@@ -64,6 +65,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        minHeight: MIN_TOUCH_TARGET,
         paddingVertical: SPACING.md,
         paddingHorizontal: SPACING.xl,
         borderRadius: RADIUS.lg,

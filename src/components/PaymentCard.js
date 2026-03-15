@@ -57,7 +57,7 @@ export default function PaymentCard({ merchant, counterparty, wallet, amount, to
                 {/* Amount */}
                 <View style={styles.amountContainer}>
                     <Text style={styles.currency}>{token === 'ETH' ? 'Ξ' : '$'}</Text>
-                    <Text style={styles.amount}>{amount || '0'}</Text>
+                    <Text style={styles.amount} maxFontSizeMultiplier={1.3}>{amount || '0'}</Text>
                 </View>
 
                 {/* Wallet (when no ENS) */}

@@ -25,8 +25,11 @@ import {
 } from '../utils/wallet';
 import { saveTransaction } from '../utils/storage';
 import { CHAINS, getChainConfig } from '../config/blockchain';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TAB_BAR_EXTRA_PADDING, SCREEN_WIDTH } from '../utils/responsive';
 
 export default function CustomerScreen() {
+    const insets = useSafeAreaInsets();
     const [payment, setPayment] = useState(null);
     const [scanning, setScanning] = useState(false);
     const [qrScanning, setQrScanning] = useState(false);
@@ -270,7 +273,18 @@ export default function CustomerScreen() {
 
     return (
         <LinearGradient colors={GRADIENTS.bg} style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scroll}>
+            <ScrollView
+                contentContainerStyle={[
+                    styles.scroll,
+                    {
+                        paddingTop: Math.max(insets.top, 44) + SPACING.md,
+                        paddingBottom: insets.bottom + TAB_BAR_EXTRA_PADDING,
+                        paddingHorizontal: Math.max(SPACING.lg, insets.left, insets.right),
+                    },
+                ]}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
                 {/* Title */}
                 <View style={styles.titleRow}>
                     <Ionicons name="send-outline" size={28} color={COLORS.primary} />
@@ -502,8 +516,7 @@ const styles = StyleSheet.create({
     },
     scroll: {
         padding: SPACING.lg,
-        paddingTop: Platform.OS === 'android' ? 50 : 60,
-        paddingBottom: 120,
+        flexGrow: 1,
     },
     titleRow: {
         flexDirection: 'row',
@@ -611,7 +624,7 @@ const styles = StyleSheet.create({
         marginTop: SPACING.md,
     },
     qrScannerContainer: {
-        width: Dimensions.get('window').width - SPACING.lg * 2,
+        width: SCREEN_WIDTH - SPACING.lg * 2,
         height: 300,
         borderRadius: RADIUS.lg,
         overflow: 'hidden',
