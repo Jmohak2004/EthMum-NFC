@@ -106,6 +106,21 @@ export async function sendUSDC(toAddress, amountInUSDC, chainKey) {
     }
 }
 
+// ─── Resolve ENS or Address to Wallet ──────────────────────────────
+/** Accept ENS name or 0x address; returns { wallet, ens } or null */
+export async function resolveRecipient(input) {
+    const trimmed = (input || '').trim().toLowerCase();
+    if (!trimmed) return null;
+    if (ethers.isAddress(trimmed)) {
+        return { wallet: ethers.getAddress(trimmed), ens: null };
+    }
+    if (trimmed.endsWith('.eth')) {
+        const address = await resolveENS(trimmed);
+        return address ? { wallet: address, ens: trimmed } : null;
+    }
+    return null;
+}
+
 // ─── ENS Resolution ─────────────────────────────────────────────────
 export async function resolveENS(ensName) {
     try {

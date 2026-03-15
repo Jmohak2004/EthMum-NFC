@@ -22,7 +22,7 @@ import GlassButton from '../components/GlassButton';
 import NfcPulse from '../components/NfcPulse';
 import PaymentCard from '../components/PaymentCard';
 import {
-    getEtherscanUrl, resolveENSProfile,
+    getEtherscanUrl, resolveENSProfile, resolveRecipient,
     sendETHViaProvider, sendUSDCViaProvider, shortenAddress,
 } from '../utils/wallet';
 import { saveTransaction } from '../utils/storage';
@@ -48,6 +48,14 @@ export default function CustomerScreen() {
     const [nfcAmountInput, setNfcAmountInput] = useState('');
     const [nfcToken, setNfcToken] = useState('USDC');
     const [nfcChain, setNfcChain] = useState(DEFAULT_CHAIN);
+
+    // Pay via ENS/Address (manual)
+    const [showEnsForm, setShowEnsForm] = useState(false);
+    const [ensRecipient, setEnsRecipient] = useState('');
+    const [ensAmount, setEnsAmount] = useState('');
+    const [ensToken, setEnsToken] = useState('USDC');
+    const [ensChain, setEnsChain] = useState(DEFAULT_CHAIN);
+    const [resolvingRecipient, setResolvingRecipient] = useState(false);
 
     // WalletConnect hooks
     const { open: openWallet } = useAppKit();
@@ -194,18 +202,73 @@ export default function CustomerScreen() {
         setQrScanning(true);
     }, [permission, requestPermission, senderReady]);
 
-    const handleQrScanned = useCallback(({ data }) => {
+    const handleQrScanned = useCallback((event) => {
         if (qrScannedRef.current) return;
+        const raw = typeof event === 'string' ? event : (event?.data ?? event?.raw ?? '');
+        const data = String(raw || '').trim();
+        if (!data) {
+            qrScannedRef.current = true;
+            setQrScanning(false);
+            return;
+        }
         qrScannedRef.current = true;
         try {
             const receiverProfile = parseReceiverProfile(data);
             setQrScanning(false);
             setPayment(receiverProfile);
-        } catch (e) {
-            Alert.alert('Invalid QR', e?.message || 'Could not read payment data from this QR code.');
-            setQrScanning(false);
+        } catch (_) {
+            const trimmed = data;
+            const isEns = trimmed.toLowerCase().endsWith('.eth');
+            const isAddress = ethers.isAddress(trimmed);
+            if (isEns || isAddress) {
+                setQrScanning(false);
+                setEnsRecipient(trimmed);
+                setEnsAmount('');
+                setShowEnsForm(true);
+            } else {
+                Alert.alert('Invalid QR', 'Scan a payment QR from the Receive tab, or a QR containing an ENS name (e.g. name.eth) or wallet address.');
+                setQrScanning(false);
+            }
         }
     }, [parseReceiverProfile]);
+
+    const handleEnsFormSubmit = useCallback(async () => {
+        if (!senderReady) return;
+        const recipient = (ensRecipient || '').trim();
+        if (!recipient) {
+            Alert.alert('Missing Recipient', 'Enter an ENS name (e.g. vitalik.eth) or wallet address (0x...).');
+            return;
+        }
+        if (!ensAmount || !/^\d+(\.\d+)?$/.test(ensAmount) || parseFloat(ensAmount) <= 0) {
+            Alert.alert('Invalid Amount', 'Enter a valid amount (e.g. 1.50).');
+            return;
+        }
+        setResolvingRecipient(true);
+        try {
+            const resolved = await resolveRecipient(recipient);
+            if (!resolved) {
+                Alert.alert('Invalid Recipient', 'Could not resolve this ENS name or address. Check the input and try again.');
+                return;
+            }
+            const paymentData = {
+                mode: 'receive-profile',
+                receiverName: resolved.ens || shortenAddress(resolved.wallet),
+                wallet: resolved.wallet,
+                ens: resolved.ens || undefined,
+                suggestedAmount: ensAmount,
+                preferredToken: ensToken,
+                preferredChain: ensChain,
+            };
+            setPayment(paymentData);
+            setShowEnsForm(false);
+            setEnsRecipient('');
+            setEnsAmount('');
+        } catch (e) {
+            Alert.alert('Error', e?.message || 'Could not resolve recipient.');
+        } finally {
+            setResolvingRecipient(false);
+        }
+    }, [senderReady, ensRecipient, ensAmount, ensToken, ensChain]);
 
     const executePayment = useCallback(async () => {
         if (!payment) return;
@@ -222,7 +285,7 @@ export default function CustomerScreen() {
             const recipientName = payment.receiverName || payment.merchant || 'Person B';
             const tokenToSend = payment.preferredToken || payment.token || 'USDC';
             const amountToSend = payment.suggestedAmount || payment.amount;
-            const chainKey = payment.preferredChain || payment.chain || 'base-sepolia';
+            const chainKey = payment.preferredChain || payment.chain || DEFAULT_CHAIN;
 
             if (!amountToSend || parseFloat(amountToSend) <= 0) {
                 Alert.alert('Missing Amount', `${recipientName} did not provide a valid requested amount.`);
@@ -279,7 +342,7 @@ export default function CustomerScreen() {
         }
 
         const recipientLabel = payment.ens || payment.wallet || 'Unknown recipient';
-        const chainName = getChainConfig(payment.preferredChain || payment.chain || 'base-sepolia').name;
+        const chainName = getChainConfig(payment.preferredChain || payment.chain || DEFAULT_CHAIN).name;
         const tokenToSend = payment.preferredToken || payment.token || 'USDC';
         const amountToSend = payment.suggestedAmount || payment.amount;
         const receiverName = payment.receiverName || payment.merchant || 'Person B';
@@ -367,8 +430,79 @@ export default function CustomerScreen() {
                     )}
                 </View>
 
+                {/* Pay to ENS / Address Form */}
+                {showEnsForm && !payment && (
+                    <View style={styles.ensFormCard}>
+                        <View style={styles.panelHandle} />
+                        <Text style={styles.formTitle}>Pay to ENS or Address</Text>
+                        <Text style={styles.label}>Recipient (ENS or 0x...)</Text>
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="person-outline" size={18} color={COLORS.textMuted} />
+                            <TextInput
+                                style={styles.input}
+                                value={ensRecipient}
+                                onChangeText={setEnsRecipient}
+                                placeholder="vitalik.eth or 0x..."
+                                placeholderTextColor={COLORS.textMuted}
+                                autoCapitalize="none"
+                            />
+                        </View>
+                        <Text style={styles.label}>Amount</Text>
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.dollarSign}>$</Text>
+                            <TextInput
+                                style={[styles.input, styles.amountInput]}
+                                value={ensAmount}
+                                onChangeText={setEnsAmount}
+                                placeholder="0.00"
+                                placeholderTextColor={COLORS.textMuted}
+                                keyboardType="decimal-pad"
+                            />
+                        </View>
+                        <Text style={styles.label}>Token</Text>
+                        <View style={styles.chipRow}>
+                            {['USDC', 'ETH'].map((t) => (
+                                <TouchableOpacity
+                                    key={t}
+                                    onPress={() => setEnsToken(t)}
+                                    style={[styles.chip, ensToken === t && styles.chipActive]}
+                                >
+                                    <Text style={[styles.chipText, ensToken === t && styles.chipTextActive]}>{t}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                        <Text style={styles.label}>Network</Text>
+                        <View style={styles.chipRow}>
+                            {CHAIN_KEYS.map((key) => (
+                                <TouchableOpacity
+                                    key={key}
+                                    onPress={() => setEnsChain(key)}
+                                    style={[styles.chip, ensChain === key && styles.chipActive]}
+                                >
+                                    <Text style={[styles.chipText, ensChain === key && styles.chipTextActive]}>{CHAINS[key].name}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                        <GlassButton
+                            title={resolvingRecipient ? 'Resolving...' : 'Continue'}
+                            onPress={handleEnsFormSubmit}
+                            gradient={GRADIENTS.primary}
+                            disabled={resolvingRecipient || !senderReady}
+                            icon={<Ionicons name="arrow-forward" size={20} color={COLORS.textDark} />}
+                            style={{ marginTop: SPACING.lg }}
+                        />
+                        <GlassButton
+                            title="Back"
+                            onPress={() => { setShowEnsForm(false); setEnsRecipient(''); setEnsAmount(''); }}
+                            gradient={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)']}
+                            icon={<Ionicons name="arrow-back" size={20} color={COLORS.textSecondary} />}
+                            style={{ marginTop: SPACING.sm }}
+                        />
+                    </View>
+                )}
+
                 {/* NFC Scan Area */}
-                {!payment && !qrScanning && (
+                {!payment && !qrScanning && !showEnsForm && (
                     <View style={styles.scanCard}>
                         <View style={styles.panelHandle} />
                         <View style={styles.scanSection}>
@@ -400,6 +534,19 @@ export default function CustomerScreen() {
                                         onPress={openQrScanner}
                                         gradient={GRADIENTS.primary}
                                         icon={<Ionicons name="qr-code-outline" size={20} color={COLORS.textDark} />}
+                                        disabled={!senderReady}
+                                        style={{ marginTop: SPACING.md }}
+                                    />
+                                    <View style={styles.divider}>
+                                        <View style={styles.dividerLine} />
+                                        <Text style={styles.dividerText}>OR</Text>
+                                        <View style={styles.dividerLine} />
+                                    </View>
+                                    <GlassButton
+                                        title="Pay to ENS or Address"
+                                        onPress={() => setShowEnsForm(true)}
+                                        gradient={GRADIENTS.primary}
+                                        icon={<Ionicons name="at-outline" size={20} color={COLORS.textDark} />}
                                         disabled={!senderReady}
                                         style={{ marginTop: SPACING.md }}
                                     />
@@ -539,7 +686,7 @@ export default function CustomerScreen() {
                                         >
                                             {pendingHash.slice(0, 10)}...{pendingHash.slice(-8)}
                                         </Text>
-                                        <Text style={styles.hashHint}>Tap to view on {getChainConfig(payment?.preferredChain || payment?.chain || 'base-sepolia').name} Explorer</Text>
+                                        <Text style={styles.hashHint}>Tap to view on {getChainConfig(payment?.preferredChain || payment?.chain || DEFAULT_CHAIN).name} Explorer</Text>
                                     </View>
                                 )}
                             </View>
@@ -596,7 +743,7 @@ export default function CustomerScreen() {
                         />
 
                         <GlassButton
-                            title={`View on ${getChainConfig(payment?.preferredChain || payment?.chain || 'base-sepolia').name} Explorer`}
+                            title={`View on ${getChainConfig(payment?.preferredChain || payment?.chain || DEFAULT_CHAIN).name} Explorer`}
                             onPress={() => Linking.openURL(getEtherscanUrl(txResult.hash, payment?.preferredChain || payment?.chain))}
                             gradient={GRADIENTS.primary}
                             icon={<Ionicons name="open-outline" size={20} color={COLORS.textDark} />}
@@ -605,7 +752,7 @@ export default function CustomerScreen() {
 
                         <GlassButton
                             title="Send Another"
-                            onPress={() => { setPayment(null); setTxResult(null); readNfc(); }}
+                            onPress={() => { setPayment(null); setTxResult(null); }}
                             gradient={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)']}
                             icon={<Ionicons name="add" size={20} color={COLORS.textSecondary} />}
                             style={{ marginTop: SPACING.sm }}
