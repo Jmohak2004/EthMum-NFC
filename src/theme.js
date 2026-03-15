@@ -1,48 +1,80 @@
-// ─── Dark Neon Glassmorphic Design System ─────────────────────────────
+// ─── Tapout UI Design System (from globals.css) ─────────────────────────
+// Extracted from tapout-ui-main: yellow accent, dark panels, Inter typography
+
 export const COLORS = {
-  bg: '#0a0a1a',
-  bgCard: '#12122a',
-  glass: 'rgba(255,255,255,0.06)',
-  glassBorder: 'rgba(255,255,255,0.12)',
-  primary: '#00e5ff',
-  primaryDim: 'rgba(0,229,255,0.15)',
-  secondary: '#7c4dff',
-  secondaryDim: 'rgba(124,77,255,0.15)',
-  success: '#00e676',
-  successDim: 'rgba(0,230,118,0.15)',
-  danger: '#ff1744',
-  dangerDim: 'rgba(255,23,68,0.15)',
-  warning: '#ffab00',
-  text: '#ffffff',
-  textSecondary: 'rgba(255,255,255,0.6)',
-  textMuted: 'rgba(255,255,255,0.35)',
-  tabBar: 'rgba(10,10,26,0.92)',
-  inputBg: 'rgba(255,255,255,0.04)',
-  inputBorder: 'rgba(255,255,255,0.1)',
+  // Accent (primary actions, highlights)
+  yellow: '#F5C518',
+  yellowLight: '#FFF3C4',
+  yellowDark: '#D4A800',
+  yellowDim: 'rgba(245,197,24,0.15)',
+
+  // Dark palette (backgrounds)
+  black: '#0A0A0A',
+  darkPanel: '#111111',
+  darkCard: '#1A1A1A',
+  darkSurface: '#252525',
+  darkBorder: '#2C2C2C',
+
+  // Light surfaces (cards, inputs)
+  white: '#FFFFFF',
+  offWhite: '#F7F7F7',
+  lightCard: '#F2F2F2',
+  lightBorder: '#EBEBEB',
+
+  // Text
+  text: '#FFFFFF',
+  textSecondary: '#9A9A9A',
+  textMuted: '#555555',
+  textDark: '#0A0A0A',
+  textDarkSecondary: '#6B6B6B',
+
+  // Semantic
+  success: '#00C896',
+  successDim: 'rgba(0,200,150,0.2)',
+  danger: '#FF4444',
+  dangerDim: 'rgba(255,68,68,0.15)',
+  blue: '#007AFF',
+
+  // Legacy mappings (for components using old keys)
+  primary: '#F5C518',
+  primaryDim: 'rgba(245,197,24,0.15)',
+  secondary: '#D4A800',
+  secondaryDim: 'rgba(212,168,0,0.15)',
+  warning: '#D4A800',
+
+  // UI
+  bg: '#0A0A0A',
+  bgCard: '#111111',
+  glass: 'rgba(37,37,37,0.95)',
+  glassBorder: '#2C2C2C',
+  tabBar: 'rgba(17,17,17,0.95)',
+  inputBg: 'rgba(255,255,255,0.06)',
+  inputBorder: 'rgba(255,255,255,0.12)',
 };
 
 export const GRADIENTS = {
-  primary: ['#00e5ff', '#7c4dff'],
-  card: ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)'],
-  success: ['#00e676', '#00bfa5'],
-  danger: ['#ff1744', '#d50000'],
-  bg: ['#0a0a1a', '#12122a', '#0a0a1a'],
+  primary: ['#F5C518', '#D4A800'],
+  card: ['rgba(37,37,37,0.6)', 'rgba(26,26,26,0.8)'],
+  success: ['#00C896', '#00A67E'],
+  danger: ['#FF4444', '#CC3636'],
+  bg: ['#0A0A0A', '#111111', '#0A0A0A'],
 };
 
 export const SPACING = {
   xs: 4,
   sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 48,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 28,
 };
 
 export const RADIUS = {
   sm: 8,
-  md: 12,
+  md: 14,
   lg: 16,
-  xl: 24,
+  xl: 20,
+  xxl: 24,
   full: 999,
 };
 
@@ -54,27 +86,34 @@ export const FONT = {
   bold: { fontWeight: '700' },
   size: {
     xs: 11,
-    sm: 13,
-    md: 15,
-    lg: 18,
-    xl: 22,
-    xxl: 28,
+    sm: 12,
+    md: 13,
+    lg: 15,
+    xl: 17,
+    xxl: 22,
     hero: 36,
   },
 };
 
 export const SHADOWS = {
-  glow: (color = COLORS.primary) => ({
+  glow: (color = COLORS.yellow) => ({
     shadowColor: color,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
     elevation: 8,
   }),
+  yellowGlow: {
+    shadowColor: '#F5C518',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
   card: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 6,
   },

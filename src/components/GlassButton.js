@@ -1,16 +1,18 @@
 import React, { useRef } from 'react';
 import { TouchableOpacity, Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, RADIUS, FONT, SHADOWS } from '../theme';
+import { COLORS, SPACING, RADIUS, FONT, SHADOWS, GRADIENTS } from '../theme';
 
 export default function GlassButton({
     title,
     onPress,
-    gradient = [COLORS.primary, COLORS.secondary],
+    gradient,
     disabled = false,
     icon = null,
     style,
 }) {
+    const colors = Array.isArray(gradient) ? gradient : (gradient || GRADIENTS.primary);
+    const isPrimaryGradient = colors[0] === COLORS.primary || colors[0] === COLORS.yellow;
     const scaleAnim = useRef(new Animated.Value(1)).current;
 
     const handlePressIn = () => {
@@ -38,13 +40,17 @@ export default function GlassButton({
                 disabled={disabled}
             >
                 <LinearGradient
-                    colors={disabled ? ['#333', '#222'] : gradient}
+                    colors={disabled ? ['#333', '#222'] : colors}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={[styles.button, disabled && styles.disabled]}
                 >
                     {icon}
-                    <Text style={[styles.text, disabled && styles.disabledText]}>
+                    <Text style={[
+                        styles.text,
+                        disabled && styles.disabledText,
+                        isPrimaryGradient && !disabled && { color: COLORS.textDark },
+                    ]}>
                         {title}
                     </Text>
                 </LinearGradient>
@@ -67,8 +73,8 @@ const styles = StyleSheet.create({
     text: {
         color: COLORS.text,
         fontSize: FONT.size.lg,
-        ...FONT.bold,
         letterSpacing: 0.5,
+        ...FONT.bold,
     },
     disabled: {
         opacity: 0.5,

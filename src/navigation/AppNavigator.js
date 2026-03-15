@@ -71,6 +71,7 @@ const styles = StyleSheet.create({
         height: 85,
         paddingTop: SPACING.sm,
         paddingBottom: SPACING.lg,
+        ...(Platform.OS === 'ios' ? {} : { elevation: 16, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.2, shadowRadius: 8 }),
     },
     tabLabel: {
         fontSize: FONT.size.xs,

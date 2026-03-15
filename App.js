@@ -28,7 +28,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AppKitProvider instance={appKit}>
-        <StatusBar barStyle="light-content" backgroundColor="#0a0a1a" />
+        <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
         <AppNavigator />
         <View style={styles.appKitContainer}>
           <AppKit />

@@ -225,9 +225,13 @@ export default function MerchantScreen() {
                 </View>
                 <Text style={styles.subtitle}>Person B shares ENS, wallet, and preferred chain</Text>
 
-                <View style={styles.strictModeBanner}>
-                    <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.warning} />
-                    <Text style={styles.strictModeText}>Strict mode: only connected wallet identity can be shared.</Text>
+                <View style={styles.spendingNote}>
+                    <View style={styles.spendingNoteIcon}>
+                        <Ionicons name="shield-checkmark-outline" size={18} color={COLORS.textDark} />
+                    </View>
+                    <Text style={styles.spendingBody}>
+                        <Text style={styles.spendingBold}>Strict mode:</Text> only connected wallet identity can be shared.
+                    </Text>
                 </View>
 
                 <View style={styles.walletConnectionSection}>
@@ -248,8 +252,8 @@ export default function MerchantScreen() {
                         <GlassButton
                             title="Connect Wallet & Auto-fill"
                             onPress={() => openWallet()}
-                            gradient={[COLORS.secondary, '#b388ff']}
-                            icon={<Ionicons name="wallet-outline" size={20} color="#fff" />}
+                            gradient={GRADIENTS.primary}
+                            icon={<Ionicons name="wallet-outline" size={20} color={COLORS.textDark} />}
                         />
                     )}
 
@@ -262,6 +266,10 @@ export default function MerchantScreen() {
                     )}
                 </View>
 
+                {/* Form Card */}
+                <View style={styles.formCard}>
+                    <View style={styles.panelHandle} />
+                    <Text style={styles.formSectionTitle}>Receive Profile</Text>
                 {/* Receiver Name */}
                 <Text style={styles.label}>Receiver Name</Text>
                 <View style={styles.inputContainer}>
@@ -351,6 +359,7 @@ export default function MerchantScreen() {
                         keyboardType="decimal-pad"
                     />
                 </View>
+                </View>
 
                 {/* NFC Pulse Animation */}
                 <View style={styles.pulseContainer}>
@@ -380,7 +389,7 @@ export default function MerchantScreen() {
                         <Ionicons
                             name={nfcStatus === 'success' ? 'refresh' : 'radio-outline'}
                             size={22}
-                            color="#fff"
+                            color={nfcStatus === 'success' ? COLORS.white : COLORS.textDark}
                         />
                     }
                     gradient={
@@ -408,15 +417,18 @@ export default function MerchantScreen() {
                 <GlassButton
                     title={qrPayload ? 'Regenerate QR Code' : 'Generate QR Code'}
                     onPress={generateQr}
-                    gradient={[COLORS.secondary, '#b388ff']}
-                    icon={<Ionicons name="qr-code-outline" size={22} color="#fff" />}
+                    gradient={GRADIENTS.primary}
+                    icon={<Ionicons name="qr-code-outline" size={22} color={COLORS.textDark} />}
                     disabled={!receiverReady}
                     style={{ marginTop: SPACING.sm }}
                 />
 
                 {qrPayload && (
                     <View style={styles.qrCard}>
-                        <Text style={styles.qrTitle}>📱 Person A scans this QR</Text>
+                        <View style={styles.qrCardHeader}>
+                            <Ionicons name="qr-code" size={24} color={COLORS.primary} />
+                            <Text style={styles.qrTitle}>Person A scans this QR</Text>
+                        </View>
                         <View style={styles.qrContainer}>
                             <QRCode
                                 value={qrPayload}
@@ -485,23 +497,56 @@ const styles = StyleSheet.create({
         fontSize: FONT.size.md,
         marginBottom: SPACING.xl,
     },
-    strictModeBanner: {
+    spendingNote: {
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.xs,
-        alignSelf: 'flex-start',
-        backgroundColor: COLORS.warning + '1A',
-        borderWidth: 1,
-        borderColor: COLORS.warning + '66',
-        borderRadius: RADIUS.full,
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.xs,
+        alignItems: 'flex-start',
+        gap: SPACING.sm,
+        backgroundColor: COLORS.yellowLight,
+        borderRadius: RADIUS.lg,
+        padding: SPACING.md,
         marginBottom: SPACING.lg,
     },
-    strictModeText: {
-        color: COLORS.warning,
-        fontSize: FONT.size.xs,
-        ...FONT.medium,
+    spendingNoteIcon: {
+        width: 28,
+        height: 28,
+        borderRadius: RADIUS.sm,
+        backgroundColor: COLORS.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    spendingBody: {
+        flex: 1,
+        fontSize: FONT.size.md,
+        color: COLORS.textDark,
+        lineHeight: 20,
+    },
+    spendingBold: {
+        fontWeight: '700',
+        color: COLORS.textDark,
+    },
+    formCard: {
+        backgroundColor: COLORS.darkCard,
+        borderRadius: RADIUS.xl,
+        padding: SPACING.xl,
+        marginTop: SPACING.md,
+        marginBottom: SPACING.md,
+        borderWidth: 1,
+        borderColor: COLORS.darkBorder,
+        ...SHADOWS.card,
+    },
+    panelHandle: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: COLORS.darkSurface,
+        alignSelf: 'center',
+        marginBottom: SPACING.lg,
+    },
+    formSectionTitle: {
+        color: COLORS.text,
+        fontSize: FONT.size.lg,
+        ...FONT.semibold,
+        marginBottom: SPACING.lg,
     },
     label: {
         color: COLORS.textSecondary,
@@ -654,18 +699,24 @@ const styles = StyleSheet.create({
     },
     qrCard: {
         alignItems: 'center',
-        backgroundColor: COLORS.glass,
+        backgroundColor: COLORS.darkCard,
         borderWidth: 1,
-        borderColor: COLORS.glassBorder,
-        borderRadius: RADIUS.lg,
-        padding: SPACING.lg,
+        borderColor: COLORS.darkBorder,
+        borderRadius: RADIUS.xl,
+        padding: SPACING.xl,
         marginTop: SPACING.lg,
+        ...SHADOWS.card,
+    },
+    qrCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.sm,
+        marginBottom: SPACING.lg,
     },
     qrTitle: {
-        color: COLORS.textSecondary,
-        fontSize: FONT.size.md,
-        ...FONT.medium,
-        marginBottom: SPACING.lg,
+        color: COLORS.text,
+        fontSize: FONT.size.lg,
+        ...FONT.semibold,
     },
     qrContainer: {
         padding: SPACING.md,

@@ -120,12 +120,14 @@ export default function HistoryScreen() {
                 />
             ) : (
                 <View style={styles.emptyState}>
-                    <View style={styles.emptyIcon}>
-                        <Ionicons name="receipt-outline" size={48} color={COLORS.textMuted} />
+                    <View style={styles.spendingNote}>
+                        <View style={styles.spendingNoteIcon}>
+                            <Ionicons name="receipt-outline" size={24} color={COLORS.textDark} />
+                        </View>
+                        <Text style={styles.spendingBody}>
+                            Completed payments will appear here. <Text style={styles.spendingBold}>Pull down</Text> or tap below to refresh.
+                        </Text>
                     </View>
-                    <Text style={styles.emptyText}>
-                        Completed payments will appear here
-                    </Text>
                     <GlassButton
                         title="Pull to Refresh"
                         onPress={onRefresh}
@@ -182,19 +184,33 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingBottom: 100,
     },
-    emptyIcon: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: COLORS.glass,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.lg,
+    spendingNote: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: SPACING.sm,
+        backgroundColor: COLORS.yellowLight,
+        borderRadius: RADIUS.lg,
+        padding: SPACING.lg,
+        marginBottom: SPACING.md,
     },
-    emptyText: {
-        color: COLORS.textMuted,
+    spendingNoteIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: RADIUS.sm,
+        backgroundColor: COLORS.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    spendingBody: {
+        flex: 1,
         fontSize: FONT.size.md,
+        color: COLORS.textDark,
+        lineHeight: 20,
         textAlign: 'center',
+    },
+    spendingBold: {
+        fontWeight: '700',
+        color: COLORS.textDark,
     },
     historyItem: {
         marginBottom: SPACING.sm,
