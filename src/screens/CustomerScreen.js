@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
     View,
     Text,
+    TextInput,
     StyleSheet,
     ScrollView,
     Alert,
@@ -9,6 +10,7 @@ import {
     Platform,
     ActivityIndicator,
     Dimensions,
+    TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,7 +26,8 @@ import {
     sendETHViaProvider, sendUSDCViaProvider, shortenAddress,
 } from '../utils/wallet';
 import { saveTransaction } from '../utils/storage';
-import { CHAINS, getChainConfig } from '../config/blockchain';
+import { ethers } from 'ethers';
+import { CHAINS, CHAIN_KEYS, DEFAULT_CHAIN, getChainConfig, RECEIVER_ADDRESS } from '../config/blockchain';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TAB_BAR_EXTRA_PADDING, SCREEN_WIDTH } from '../utils/responsive';
 
@@ -40,6 +43,11 @@ export default function CustomerScreen() {
     const [ensProfile, setEnsProfile] = useState(null);
     const [permission, requestPermission] = useCameraPermissions();
     const qrScannedRef = useRef(false);
+
+    // NFC hardcoded flow: user enters amount after tag detected
+    const [nfcAmountInput, setNfcAmountInput] = useState('');
+    const [nfcToken, setNfcToken] = useState('USDC');
+    const [nfcChain, setNfcChain] = useState(DEFAULT_CHAIN);
 
     // WalletConnect hooks
     const { open: openWallet } = useAppKit();
@@ -121,13 +129,41 @@ export default function CustomerScreen() {
 
             const tag = await NfcManager.getTag();
 
-            if (tag?.ndefMessage?.[0]?.payload) {
-                const payload = Ndef.text.decodePayload(tag.ndefMessage[0].payload);
-                const receiverProfile = parseReceiverProfile(payload);
-                setPayment(receiverProfile);
-            } else {
-                Alert.alert('No Data', 'NFC tag does not contain payment data.');
+            if (!tag) {
+                Alert.alert('NFC Error', 'Could not read tag.');
+                return;
             }
+
+            // Hardcoded flow: any tag detected → "Connection successful" → use hardcoded receiver address
+            if (!RECEIVER_ADDRESS || !ethers.isAddress(RECEIVER_ADDRESS)) {
+                Alert.alert(
+                    'Receiver Not Configured',
+                    'Add HARDCODED_RECEIVER_ADDRESS to your .env file to use the NFC payment flow.',
+                );
+                return;
+            }
+
+            setScanning(false);
+            try {
+                await NfcManager.cancelTechnologyRequest();
+            } catch (_) { }
+
+            Alert.alert(
+                '✅ Connection Successful',
+                `Receiver address: ${shortenAddress(RECEIVER_ADDRESS)}\n\nEnter the amount to send.`,
+                [{ text: 'OK' }],
+            );
+
+            setPayment({
+                mode: 'receive-profile',
+                fromNfcHardcoded: true,
+                wallet: RECEIVER_ADDRESS,
+                receiverName: 'Receiver',
+                preferredToken: nfcToken,
+                preferredChain: nfcChain,
+                suggestedAmount: '',
+            });
+            setNfcAmountInput('');
         } catch (e) {
             console.warn('NFC Read Error:', e);
             if (e?.message !== 'cancelled') {
@@ -139,7 +175,7 @@ export default function CustomerScreen() {
                 await NfcManager.cancelTechnologyRequest();
             } catch (_) { }
         }
-    }, [senderReady, parseReceiverProfile]);
+    }, [senderReady, nfcToken, nfcChain]);
 
     const openQrScanner = useCallback(async () => {
         if (!senderReady) {
@@ -399,8 +435,79 @@ export default function CustomerScreen() {
                     </View>
                 )}
 
-                {/* Payment Details */}
-                {payment && !txResult && (
+                {/* NFC Hardcoded: amount form (user enters amount before confirming) */}
+                {payment?.fromNfcHardcoded && !payment?.suggestedAmount && !txResult && (
+                    <View style={styles.ensFormCard}>
+                        <View style={styles.panelHandle} />
+                        <Text style={styles.formTitle}>Enter Amount to Send</Text>
+                        <Text style={styles.label}>Receiver</Text>
+                        <Text style={[styles.input, { backgroundColor: 'transparent', paddingVertical: SPACING.sm }]}>{shortenAddress(payment.wallet)}</Text>
+                        <Text style={styles.label}>Amount</Text>
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.dollarSign}>$</Text>
+                            <TextInput
+                                style={[styles.input, styles.amountInput]}
+                                value={nfcAmountInput}
+                                onChangeText={setNfcAmountInput}
+                                placeholder="0.00"
+                                placeholderTextColor={COLORS.textMuted}
+                                keyboardType="decimal-pad"
+                            />
+                        </View>
+                        <Text style={styles.label}>Token</Text>
+                        <View style={styles.chipRow}>
+                            {['USDC', 'ETH'].map((t) => (
+                                <TouchableOpacity
+                                    key={t}
+                                    onPress={() => setNfcToken(t)}
+                                    style={[styles.chip, nfcToken === t && styles.chipActive]}
+                                >
+                                    <Text style={[styles.chipText, nfcToken === t && styles.chipTextActive]}>{t}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                        <Text style={styles.label}>Network</Text>
+                        <View style={styles.chipRow}>
+                            {CHAIN_KEYS.map((key) => (
+                                <TouchableOpacity
+                                    key={key}
+                                    onPress={() => setNfcChain(key)}
+                                    style={[styles.chip, nfcChain === key && styles.chipActive]}
+                                >
+                                    <Text style={[styles.chipText, nfcChain === key && styles.chipTextActive]}>{CHAINS[key].name}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                        <GlassButton
+                            title="Continue"
+                            onPress={() => {
+                                if (!nfcAmountInput || !/^\d+(\.\d+)?$/.test(nfcAmountInput) || parseFloat(nfcAmountInput) <= 0) {
+                                    Alert.alert('Invalid Amount', 'Enter a valid amount (e.g. 1.50).');
+                                    return;
+                                }
+                                setPayment((prev) => ({
+                                    ...prev,
+                                    suggestedAmount: nfcAmountInput,
+                                    preferredToken: nfcToken,
+                                    preferredChain: nfcChain,
+                                }));
+                            }}
+                            gradient={GRADIENTS.primary}
+                            icon={<Ionicons name="arrow-forward" size={20} color={COLORS.textDark} />}
+                            style={{ marginTop: SPACING.lg }}
+                        />
+                        <GlassButton
+                            title="Cancel"
+                            onPress={() => setPayment(null)}
+                            gradient={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)']}
+                            icon={<Ionicons name="arrow-back" size={20} color={COLORS.textSecondary} />}
+                            style={{ marginTop: SPACING.sm }}
+                        />
+                    </View>
+                )}
+
+                {/* Payment Details (also when NFC hardcoded after amount entered) */}
+                {payment && !txResult && (payment.suggestedAmount || !payment.fromNfcHardcoded) && (
                     <View style={styles.paymentSection}>
                         <View style={styles.badge}>
                             <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
@@ -456,7 +563,7 @@ export default function CustomerScreen() {
                         {!sending && (
                             <GlassButton
                                 title="Cancel"
-                                onPress={() => { setPayment(null); readNfc(); }}
+                                onPress={() => setPayment(null)}
                                 gradient={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)']}
                                 icon={<Ionicons name="close" size={20} color={COLORS.textSecondary} />}
                                 style={{ marginTop: SPACING.sm }}
@@ -744,5 +851,78 @@ const styles = StyleSheet.create({
     spendingBold: {
         fontWeight: '700',
         color: COLORS.textDark,
+    },
+    ensFormCard: {
+        backgroundColor: COLORS.darkCard,
+        borderRadius: RADIUS.xl,
+        padding: SPACING.xl,
+        marginTop: SPACING.md,
+        marginBottom: SPACING.md,
+        borderWidth: 1,
+        borderColor: COLORS.darkBorder,
+        width: '100%',
+    },
+    formTitle: {
+        color: COLORS.text,
+        fontSize: FONT.size.lg,
+        ...FONT.semibold,
+        marginBottom: SPACING.lg,
+    },
+    label: {
+        color: COLORS.textSecondary,
+        fontSize: FONT.size.sm,
+        ...FONT.medium,
+        marginBottom: SPACING.sm,
+        marginTop: SPACING.md,
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.inputBg,
+        borderWidth: 1,
+        borderColor: COLORS.inputBorder,
+        borderRadius: RADIUS.md,
+        paddingHorizontal: SPACING.md,
+        gap: SPACING.sm,
+    },
+    input: {
+        flex: 1,
+        color: COLORS.text,
+        fontSize: FONT.size.md,
+        paddingVertical: SPACING.md,
+    },
+    dollarSign: {
+        color: COLORS.textSecondary,
+        fontSize: FONT.size.xl,
+        ...FONT.light,
+    },
+    amountInput: {
+        fontSize: FONT.size.xl,
+        ...FONT.bold,
+    },
+    chipRow: {
+        flexDirection: 'row',
+        gap: SPACING.sm,
+    },
+    chip: {
+        paddingHorizontal: SPACING.lg,
+        paddingVertical: SPACING.sm,
+        borderRadius: RADIUS.full,
+        backgroundColor: COLORS.glass,
+        borderWidth: 1,
+        borderColor: COLORS.glassBorder,
+    },
+    chipActive: {
+        backgroundColor: COLORS.primaryDim,
+        borderColor: COLORS.primary,
+    },
+    chipText: {
+        color: COLORS.textSecondary,
+        fontSize: FONT.size.md,
+        ...FONT.medium,
+    },
+    chipTextActive: {
+        color: COLORS.primary,
+        ...FONT.bold,
     },
 });

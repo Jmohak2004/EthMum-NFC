@@ -1,6 +1,6 @@
 // ─── Blockchain Configuration ────────────────────────────────────────
 // Non-secret config lives here. Secrets (private keys, API keys) stay in .env
-import { SEPOLIA_RPC_URL, BASE_SEPOLIA_RPC_URL } from '@env';
+import { SEPOLIA_RPC_URL, BASE_SEPOLIA_RPC_URL, HARDCODED_RECEIVER_ADDRESS } from '@env';
 
 // ─── Chain Definitions ──────────────────────────────────────────────
 export const CHAINS = {
@@ -36,6 +36,9 @@ export const CHAINS = {
 
 export const CHAIN_KEYS = Object.keys(CHAINS);
 export const DEFAULT_CHAIN = 'sepolia';
+
+/** Hardcoded receiver for NFC flow: tap tag -> "Connection successful" -> send to this address */
+export const RECEIVER_ADDRESS = (HARDCODED_RECEIVER_ADDRESS || '').trim() || null;
 
 // Legacy compat — used by MerchantScreen default
 export const NETWORK = DEFAULT_CHAIN;
